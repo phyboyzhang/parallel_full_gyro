@@ -1,0 +1,6 @@
+ADD_SUBDIRECTORY(field_mesh)
+ADD_SUBDIRECTORY(pic_layout)
+
+ADD_SUBDIRECTORY(testing)
+
+

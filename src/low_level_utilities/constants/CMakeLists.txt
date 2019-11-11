@@ -1,0 +1,7 @@
+ADD_LIBRARY(constants STATIC constants.F90)
+TARGET_LINK_LIBRARIES(constants work_precision)
+
+
+IF(BUILD_TESTING)
+  #  ADD_SUBDIRECTORY(testing)
+ENDIF(BUILD_TESTING)

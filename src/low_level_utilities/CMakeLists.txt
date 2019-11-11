@@ -1,0 +1,5 @@
+  ADD_SUBDIRECTORY(constants)
+  ADD_SUBDIRECTORY(work_precision)
+  ADD_SUBDIRECTORY(utilities)
+  ADD_SUBDIRECTORY(assert)
+# ADD_SUBDIRECTORY(memory)

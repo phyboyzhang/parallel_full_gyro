@@ -1,0 +1,8 @@
+ADD_EXECUTABLE(test_initial_field test_initial_field.F90)
+ADD_EXECUTABLE(test_initial_field_two test_initial_field_two.F90)
+TARGET_LINK_LIBRARIES(test_initial_field field_mesh meshes)
+TARGET_LINK_LIBRARIES(test_initial_field_two field_mesh meshes)
+
+#ADD_EXECUTABLE(test_suspect test_suspect.F90)
+
+#TARGET_LINK_LIBRARIES(test_suspect interpolation)

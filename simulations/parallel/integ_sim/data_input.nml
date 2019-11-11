@@ -1,0 +1,33 @@
+&mesh
+gxmin =  
+gxmax =
+cell_per_unit= 
+
+&gyro
+mumin = 0.0
+mumax = 20.0
+N_points = 100
+gyroorder=1
+
+&test_particles
+numcircle = 3
+
+&time_step
+dtgy = 
+dtful = 
+num_time = 
+iter_num = 
+
+&pic
+numparticle = 
+
+&profile
+
+
+&conditions
+boundary = "double_per"
+geometry = "cartesian"
+
+&parallel
+row = 
+

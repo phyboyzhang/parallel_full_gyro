@@ -1,0 +1,41 @@
+&mesh
+nodes_x1 = 120
+nodes_x2 = 120
+x1_min = 0.0
+x1_max = 6.2831832 !12.565
+x2_min = 0.0
+x2_max = 6.2831832   ! 12.565
+/
+
+&wave
+amplitude =  1.0e-2  !1.0e-2
+wavenumber_one =6.0  ! 1.0
+wavenumber_two =6.0  !  1.0
+/
+
+&iteration
+iter_number = 20000
+dt_gc = 0.5
+num_time = 20
+/
+
+&gyro
+gyropoints = 100
+mu = 0.2
+! orbitorder = 1  ! The first order gyroceter equation
+ orbitorder = 2  ! The second order gyrocenter equation
+/
+
+&init_position_number
+x1=5.0
+x2=5.0
+x3=0.0
+N_par = 1
+/
+
+&params 
+flag = 0
+contr = 4.0
+boundary = "nat_per"
+geometry = "cartesian"
+/

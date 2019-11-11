@@ -1,0 +1,3 @@
+ADD_EXECUTABLE(test_mpilayout test_mpilayout.F90)
+
+Target_Link_Libraries(test_mpilayout mpilayout)

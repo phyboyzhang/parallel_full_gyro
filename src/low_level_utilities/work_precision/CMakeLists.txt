@@ -1,0 +1,6 @@
+ADD_LIBRARY(work_precision STATIC m_work_precision.F90)
+
+
+#IF(BUILD_TESTING)
+  ADD_SUBDIRECTORY(testing)
+  #ENDIF(BUILD_TESTING)
