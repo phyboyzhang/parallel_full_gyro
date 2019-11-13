@@ -962,6 +962,10 @@ subroutine mpi2d_alltoallv_box_per_per(row,commold,rank,numproc, &
    allocate(rcounts(0:size-1))
    allocate(sdispls(0:size-1))
    allocate(rdispls(0:size-1))
+   scounts=0
+   rcounts=0
+   sdispls=0
+   rdispls=0
 
   coords=get_coords_from_processrank(rank,numproc)
 

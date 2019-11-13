@@ -41,9 +41,22 @@ contains
          allocate(tp_ful2dsend_head(i)%ptr)
        end do
 
-
+!if(iter_num==4) then
+!tpful2dtmp=>tp_ful2d_head
+!do while(associated(tpful2dtmp))
+!   if(.not.associated(tpful2dtmp%next)) then
+!      exit
+!   else
+!      print*, "rank1=",rank,"coords1=",tpful2dtmp%coords(1:4)
+!      tpful2dtmp=>tpful2dtmp%next
+!   end if
+!end do
+!end if
+ 
         call tp_ful_solve(tp_ful2d_head,pic2d,numleft,pushkind,rk4order,iter_num)
+
         call tp_sort_particles_among_ranks(tp_ful2d_head,tp_ful2dsend_head,pic2d,num)
+
         call tp_mpi2d_alltoallv_send_particle_2d(tp_ful2d_head,numleft,tp_ful2dsend_head,num,numgr,pic2d)
 
        deallocate(tp_ful2dsend_head,num)
@@ -152,12 +165,26 @@ contains
        end if 
 
        call tp_ful2dlist_to_ful2dlist(ful2d_head,tp_ful2d_head)
+!if(iter_num==2) then
+!tpful2dtmp=>tp_ful2d_head
+!do while(associated(tpful2dtmp))
+!   if(.not.associated(tpful2dtmp%next)) then
+!      exit
+!   else
+!      print*, "rank2=",rank,"coords1=",tpful2dtmp%coords(1:4)
+!      tpful2dtmp=>tpful2dtmp%next
+!   end if
+!end do
+!end if
+
        if(pushkind=="boris") then
          call borissolve(ful2d_head,pic2d,numleft)
        else if(pushkind=="rk4") then
          call fulrk4solve(ful2d_head,pic2d,rk4order,iter_num)
        end if
+
        call ful2dlist_to_tp_ful2dlist(tp_ful2d_head,ful2d_head,rank)
+ 
        deallocate(ful2d_head)
        nullify(ful2d_head)
     end subroutine tp_ful_solve

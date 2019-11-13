@@ -199,7 +199,7 @@ end type simulation_orbit_comparison
   NC(1)= sim%m_x1%num_cells
   NC(2)= sim%m_x2%num_cells
 
-print*, 1
+!print*, 1
   !!!! initialize the epotenital mesh and Bfield mesh
   call  compute_field_2d_mesh( &
        sim%field_2d, &
@@ -212,7 +212,7 @@ print*, 1
        geometry)
 
 !!!! compute the steaf matrix of eletrostatic potental and the magnetic field
-print*,2
+!print*,2
 
   select case(geometry)
   case("cartesian")
@@ -276,7 +276,7 @@ print*,2
 
  
 
-  print*,5
+!  print*,5
   x_pos(1)=x1
   x_pos(2)=x2
   x_pos(3)=x3
@@ -303,9 +303,9 @@ print*,2
 !end if
 
 if(boundary=="double_per") then
- open(12,file="/PARA/blsc950/electrostatic_exp/run/per_per_elef.txt", status="replace")
+ open(12,file="/home/qmlu/zsx163/parallel_full_gyro/run/per_per_elef.txt", status="replace")
 else 
- open(11,file="/PARA/blsc950/electrostatic_exp/run/nat_per_elef.txt", status="replace")
+ open(11,file="/home/qmlu/zsx163/parallel_full_gyro/run/nat_per_elef.txt", status="replace")
 end if
 
   call borisrun(x4,v4, &
@@ -315,7 +315,7 @@ end if
        sim%iter_number, &
        sim%dt_gc/real(sim%num_time,8), &
        geometry,boundary)
-  print*,6
+!  print*,6
 
   do i=1,3
   x4(i)=sim%full2d2v%init_pos_full(1,i)
@@ -345,7 +345,7 @@ else
 end if
   
    
-  print*, 7
+!  print*, 7
  
   if(orbitorder==2) then 
   select case(geometry)
@@ -369,7 +369,7 @@ end if
   
   end if
   
-print*,9 
+!print*,9 
   call gyrorkorbit( &
        sim%gyro2d2v%init_pos_gyro(1,1:2), &
        sim%field_2d%Bf_weight_3rd, &

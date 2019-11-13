@@ -88,9 +88,10 @@ contains
       int4, intent(in) :: fileitem,numleft,numgr,iter_num
       class(pic_para_total2d_base), pointer, intent(in) :: pic2d
       int4, dimension(:),pointer :: rcounts,rdispls 
-      real8, dimension(:), pointer :: outarray
-      int4 :: numtot,size,rank,comm
-      
+      real8, dimension(:), pointer :: outarray,outarrayone
+      int4 :: numtot,size,rank,comm,i
+      real8 :: vperp,rholength,gc(2)      
+
       comm=pic2d%layout2d%collective%comm
       size=pic2d%layout2d%collective%size
       rank=pic2d%layout2d%collective%rank
@@ -98,15 +99,25 @@ contains
       call prepare_recv_for_gatherv(numtot,rcounts,rdispls,numleft,numgr,size,comm,rank) 
       if(rank==0) then
         allocate(outarray(1:(numtot/numgr)*(numgr-1)))
+        allocate(outarrayone(1:(numtot/numgr)*(numgr+1)))
       else
         allocate(outarray(0:0))
       end if
 
       call tp_gather_coords_to_rootprocess(outarray,tp_ful2d_head,numleft,numtot,numgr,rcounts, &
                                                rdispls,pic2d)
-
+!!!!!! HERE, numger=5
       if(rank==0) then
-         write(fileitem, *) iter_num,outarray(:)
+        do i=0,numtot/numgr-1
+          outarrayone((numgr+1)*i+1:(numgr+2)*i+4)=outarray(numgr*i+1:numgr*i+4)
+          vperp=sqrt(outarray(numgr*i+3)**2+outarray(numgr*i+4)**2)
+          rholength=vperp
+          outarrayone((numgr+1)*i+5)=outarray(numgr*i+1)+rholength*outarray(numgr*i+4)/vperp
+          outarrayone((numgr+1)*i+6)=outarray(numgr*i+2)-rholength*outarray(numgr*i+3)/vperp          
+        end do 
+
+         write(fileitem, *) iter_num,outarrayone(:)
+         deallocate(outarrayone)
       end if
 
       deallocate(rcounts,rdispls)

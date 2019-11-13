@@ -86,7 +86,7 @@ include "mpif.h"
     int4 :: rank,size,global_sz(2)
     real8 :: delta(2)
     int4  :: num1,num2,row
-    real8 :: amp=1.0,wave_one=1.0,wave_two=1.0
+    real8 :: amp,wave_one,wave_two,amp_eq
     character(90) :: geometry="cartesian"
     int4  :: i,j,size1,k
     int4  :: rankone,startind(2),globalind(2)
@@ -142,6 +142,7 @@ include "mpif.h"
    int4, dimension(:), pointer :: num_rk4,num_gy
    real8 :: rho, theta,x2(2)
    int4 :: rk4order
+   int4 :: orbit_field=1
 
     allocate(weight(-1:2,-1:2))
 
@@ -169,15 +170,15 @@ include "mpif.h"
     pic2d=> initialize_pic_para_total2d_base(size)
 !!! initialize parameter_2d_sets
     pic2d%para2d%gxmin=(/0.0,0.0/)
-    pic2d%para2d%gxmax=(/12.0,12.0/)
+    pic2d%para2d%gxmax=(/15.0,15.0/)
     pic2d%para2d%N_points=3
     pic2d%para2d%iter_number=100
     pic2d%para2d%numcircle=3
     pic2d%para2d%dtgy=1.0
-    pic2d%para2d%num_time=10
+    pic2d%para2d%num_time=15
     pic2d%para2d%boundary="double_per"
     pic2d%para2d%geometry="cartesian"
-    pic2d%para2d%mu=0.2
+    pic2d%para2d%mu=0.1
     pic2d%para2d%row=3
     pic2d%para2d%cell_per_unit=(/10,10/) 
     pic2d%para2d%dtful=pic2d%para2d%dtgy/real(pic2d%para2d%num_time,8)
@@ -188,6 +189,10 @@ include "mpif.h"
     pic2d%para2d%mumax=20._F64
     pic2d%para2d%gyroorder=1
     row=pic2d%para2d%row
+    amp=0.001
+    amp_eq=0.01
+    wave_one=1.0
+    wave_two=1.0
 
     do i=1,2
        delta(i)=1._f64/real(pic2d%para2d%cell_per_unit(i),8)
@@ -252,7 +257,7 @@ if(rank==0) then
 end if
 
     pic2d%para2d%m_x1=>init_para_cartesian_mesh_1d(pic2d%layout2d%boxes(rank)%i_max-pic2d%layout2d%boxes(rank)%i_min+1,&
-  pic2d%para2d%gboxmin(rank,1),pic2d%para2d%gboxmax(rank,1),delta(1))
+    pic2d%para2d%gboxmin(rank,1),pic2d%para2d%gboxmax(rank,1),delta(1))
     pic2d%para2d%m_x2=>init_para_cartesian_mesh_1d(pic2d%layout2d%boxes(rank)%j_max-pic2d%layout2d%boxes(rank)%j_min+1,&
     pic2d%para2d%gboxmin(rank,2),pic2d%para2d%gboxmax(rank,2),delta(2)) 
     num1=pic2d%layout2d%boxes(rank)%i_max-pic2d%layout2d%boxes(rank)%i_min+1
@@ -260,7 +265,7 @@ end if
 
 
     call allocate_memory_to_field_2d(pic2d%field2d,num1,num2,row)
-   rootdata=>initialize_rootdata_structure(pic2d%layout2d%global_sz1*pic2d%layout2d%global_sz2)
+    rootdata=>initialize_rootdata_structure(pic2d%layout2d%global_sz1*pic2d%layout2d%global_sz2)
 
     boxindex(1)=pic2d%layout2d%boxes(rank)%i_min
     boxindex(2)=pic2d%layout2d%boxes(rank)%i_max
@@ -270,6 +275,8 @@ end if
   !!!periodic boundary condition
 !   call para_initialize_field_2d_mesh(amp,wave_one,wave_two, pic2d)
   dimsize=dimsize_of_rank_per_per(rank,pic2d%para2d%numproc,pic2d%layout2d)
+
+  if(orbit_field==0) then
   do i=1,dimsize(1)
     do j=1, dimsize(2)
        globalind=globalind_from_localind_2d((/i,j/),pic2d%para2d%numproc,rank,pic2d%layout2d,pic2d%para2d%boundary)
@@ -277,6 +284,9 @@ end if
        pic2d%field2d%Bf03(i,j)=1.0
     end do
   end do
+  else
+    call para_initialize_field_2d_mesh(amp,amp_eq,wave_one,wave_two, pic2d) 
+  endif
 
   if(rank==0) then
     call compute_D_spl2D_per_per_noblock( &
@@ -347,7 +357,7 @@ end if
    do j=0,numcircle-1
        theta=real(j,8)*2.0_f64*pi_/real(numcircle,8)
        coords(1)=x1(1)+rho*cos(theta)
-       coords(2)=x2(2)+rho*sin(theta)
+       coords(2)=x1(2)+rho*sin(theta)
        coords(3)=rho*cos(theta+pi_/2.0_f64)
        coords(4)=rho*sin(theta+pi_/2.0_f64)
 !print*, "coords=",coords(1:4)
@@ -429,7 +439,7 @@ end if
    fileitem_boris=10
    fileitem_rk4  =20
    fileitem_gy   =30
-   filepath1="/home/qmlu/zsx163/electrostatic_exp/run/orbit_"
+   filepath1="/home/qmlu/zsx163/parallel_full_gyro/run/orbit/orbit_"
 
    filepath_boris=trim(filepath1)//"boris"//".txt"
    filepath_rk4  =trim(filepath1)//"rk4"//".txt"
@@ -452,17 +462,17 @@ end if
 !print*, "rank2=",rank,num_p
 rk4order=4
 
-     do i=1, 1000
+     do i=1, 10000
 if(rank==0) then
 print*, "#i=",i
 end if
-!         call tp_push_ful_orbit(tpful2d_head,numleft_boris,numgr,pic2d,"boris",rk4order,i)
+         call tp_push_ful_orbit(tpful2d_head,numleft_boris,numgr,pic2d,"boris",rk4order,i)
          call tp_push_ful_orbit(tprk4ful2d_head,numleft_rk4,numgr,pic2d,"rk4", rk4order,i)
-!         call tp_push_gy_orbit(tpgy2d_head,numleft_gy,numgr_gy,pic2d,rk4order,i) 
+         call tp_push_gy_orbit(tpgy2d_head,numleft_gy,numgr_gy,pic2d,rk4order,i) 
 
-!         call para_write_orbit_file_2d(tpful2d_head,numleft_boris,numgr,fileitem_boris,pic2d,i) 
-!         call para_write_orbit_file_2d(tprk4ful2d_head,numleft_rk4,numgr,fileitem_rk4,pic2d,i)
-!         call para_write_orbit_file_2d_gy(tpgy2d_head,numleft_gy,numgr_gy,fileitem_gy,pic2d,i)
+         call para_write_orbit_file_2d(tpful2d_head,numleft_boris,numgr,fileitem_boris,pic2d,i) 
+         call para_write_orbit_file_2d(tprk4ful2d_head,numleft_rk4,numgr,fileitem_rk4,pic2d,i)
+         call para_write_orbit_file_2d_gy(tpgy2d_head,numleft_gy,numgr_gy,fileitem_gy,pic2d,i)
 call mpi_barrier(pic2d%layout2d%collective%comm)
      end do
 

@@ -148,7 +148,7 @@ include "mpif.h"
     pic2d=> initialize_pic_para_total2d_base(size)
 !!! initialize parameter_2d_sets
     pic2d%para2d%gxmin=(/0.0,0.0/)
-    pic2d%para2d%gxmax=(/3.0,3.0/)
+    pic2d%para2d%gxmax=(/12.0,12.0/)
     pic2d%para2d%N_points=3
     pic2d%para2d%iter_number=500000
     pic2d%para2d%dtgy=1.0
@@ -157,7 +157,7 @@ include "mpif.h"
     pic2d%para2d%geometry="cartesian"
     pic2d%para2d%mu=0.2
     pic2d%para2d%row=3
-    pic2d%para2d%cell_per_unit=(/5,5/) 
+    pic2d%para2d%cell_per_unit=(/10,10/) 
     pic2d%para2d%dtful=pic2d%para2d%dtgy/real(pic2d%para2d%num_time,8)
     !!! particle in cell part
     pic2d%para2d%numparticle=5000
@@ -331,10 +331,10 @@ end if
 !print*, "rank1=",rank1
 !endif
             if(rank1==rank) then 
-!              ful2dtmp%coords(1:4)=coords(1:4)
-!              num_p(rank1)=num_p(rank1)+1
-!              allocate(ful2dtmp%next)
-!              ful2dtmp=>ful2dtmp%next
+              ful2dtmp%coords(1:4)=coords(1:4)
+              num_p(rank1)=num_p(rank1)+1
+              allocate(ful2dtmp%next)
+              ful2dtmp=>ful2dtmp%next
 
               gy2dtmp%coords(1:2)=coords(1:2)
               gy2dtmp%coords(3)=pic2d%para2d%mu 
@@ -342,13 +342,13 @@ end if
               allocate(gy2dtmp%next)
               gy2dtmp=>gy2dtmp%next
             else
-!              currk(rank1)%ptr%coords(1)=coords(1)
-!              currk(rank1)%ptr%coords(2)=coords(2)
-!              currk(rank1)%ptr%coords(3)=coords(3)
-!              currk(rank1)%ptr%coords(4)=coords(4)
-!              num_p(rank1)=num_p(rank1)+1
-!              allocate(currk(rank1)%ptr%next)
-!              currk(rank1)%ptr=>currk(rank1)%ptr%next 
+              currk(rank1)%ptr%coords(1)=coords(1)
+              currk(rank1)%ptr%coords(2)=coords(2)
+              currk(rank1)%ptr%coords(3)=coords(3)
+              currk(rank1)%ptr%coords(4)=coords(4)
+              num_p(rank1)=num_p(rank1)+1
+              allocate(currk(rank1)%ptr%next)
+              currk(rank1)%ptr=>currk(rank1)%ptr%next 
 
 
               gy2dsendtmp(rank1)%ptr%coords(1)=coords(1)
@@ -371,7 +371,7 @@ call mpi_barrier(comm)
    end do
    ful2dtmp=>ful2d_head
    gy2dtmp=>gy2d_head
-!   call mpi2d_alltoallv_send_particle_2d(ful2dtmp,currk,num_p,pic2d)
+   call mpi2d_alltoallv_send_particle_2d(ful2dtmp,currk,num_p,pic2d)
 
    call mpi2d_alltoallv_send_particle_2d_gy(gy2dtmp,gy2dsendtmp,num_gy,pic2d)
 
@@ -507,14 +507,14 @@ call mpi_barrier(comm)
 !  call compute_f_of_points_out_orbit_ful2d(num_p,numgr,recnum,inlist,partlist,pic2d,order)
 !  call  compute_f_of_points_in_orbit_ful2d(partlist,pic2d,order)
 
-  rk4order=2
+  rk4order=4
 
-!  do i=1, 1000
+  do i=1, 100
 !   if(rank==0) then
 !   print*, "#iter_numeber=", i
 !   end if
 !   ful2dtmp=>ful2d_head 
-!   call fulrk4solve(ful2dtmp,pic2d,rk4order,i)
+   call fulrk4solve(ful2dtmp,pic2d,rk4order,i)
 !   ful2dtmp=>ful2d_head
 !   do j=0,size-1
 !      nullify(pic2d%ful2dsend_head(j)%ptr%next) 
@@ -532,7 +532,7 @@ call mpi_barrier(comm)
 !   num_gy=0
 !   call sort_particles_among_ranks_gy(gy2d_head,gy2dsend_head,pic2d,num_gy)
 !   call mpi2d_alltoallv_send_particle_2d_gy(gy2d_head,gy2dsend_head,num_gy,pic2d)
-! end do
+ end do
 !print*, rank
  
 !  call close_file(fileitem1,rank)

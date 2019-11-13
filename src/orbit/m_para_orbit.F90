@@ -176,6 +176,9 @@ subroutine boris_single(x,v,dtful,magf,elef)
    f(4)=elef(1)+v(2)*magf(3)-v(3)*magf(2)
    f(5)=elef(2)+v(3)*magf(1)-v(1)*magf(3)
    f(6)=elef(3)+v(1)*magf(2)-v(2)*magf(1)
+
+!  print*, "elef=",elef(1:2), "magf=",magf(1:2)
+!   print*, "f=",f(1:2),f(4:5)
   return
  end subroutine fulrkfunc_f_per_per
 
@@ -197,7 +200,9 @@ subroutine boris_single(x,v,dtful,magf,elef)
     comm=pic2d%layout2d%collective%comm
     dt=pic2d%para2d%dtful
     allocate(num(0:size-1),recnum(0:size-1))
-    allocate(partlist,inlist) 
+    allocate(partlist,inlist)
+    num=0
+    recnum=0 
     rank=pic2d%layout2d%collective%rank
     tmp=>ful2d_head
     partmp=>partlist
@@ -223,10 +228,10 @@ subroutine boris_single(x,v,dtful,magf,elef)
     numgr=4
 
     if(rk4order==2) then
-    order=1
-    num=0
-    recnum=0
-   call  compute_f_of_points_in_orbit_ful2d(partlist,pic2d,order)
+       order=1
+       num=0
+       recnum=0
+       call  compute_f_of_points_in_orbit_ful2d(partlist,pic2d,order)
 !     call simple_f(partlist,order)
 
 !if(iter_num==1.or.iter_num==7) then
@@ -245,98 +250,108 @@ subroutine boris_single(x,v,dtful,magf,elef)
 !if(iter_num==7) then
 !print*, "rank1=",rank
 !end if
-    deallocate(inlist)
-    nullify(inlist)
-    allocate(inlist)
-    recnum=0
-    num=0
-    order=2
-    call sortposition_by_process_ful2d(num,recnum,partlist,inlist,pic2d,dt,order,rk4order,iter_num)
-    call compute_f_of_points_out_orbit_ful2d(num,numgr,recnum,inlist,partlist,pic2d,order,iter_num)
-    call compute_f_of_points_in_orbit_ful2d(partlist,pic2d,order)
+!   if(iter_num==2) then
+!      print*, 1
+!   end if
 
-    tmp=>ful2d_head
-    partmp=>partlist
-    do while(associated(partmp))
-      if(.not.associated(partmp%next)) then
-         exit
-      else
-         if(.not.associated(tmp)) then
-           exit
+       deallocate(inlist)
+       nullify(inlist)
+       allocate(inlist)
+       recnum=0
+       num=0
+       order=2
+       call sortposition_by_process_ful2d(num,recnum,partlist,inlist,pic2d,dt,order,rk4order,iter_num)
+       call compute_f_of_points_out_orbit_ful2d(num,numgr,recnum,inlist,partlist,pic2d,order,iter_num)
+       call compute_f_of_points_in_orbit_ful2d(partlist,pic2d,order)
+
+       tmp=>ful2d_head
+       partmp=>partlist
+       do while(associated(partmp))
+         if(.not.associated(partmp%next)) then
+            exit
          else
-         vec0(1:2)=partmp%coords(1:2)
-         vec0(4:5)=partmp%coords(3:4)
-         partmp%vec(:)=vec0(:)+(dt/2.0_f64)*(partmp%f1(:)+partmp%f2(:))
-         tmp%coords(1:2)=partmp%vec(1:2)
-         tmp%coords(3:4)=partmp%vec(4:5)
+           if(.not.associated(tmp)) then
+             exit
+           else
+             vec0(1:2)=partmp%coords(1:2)
+             vec0(4:5)=partmp%coords(3:4)
+             partmp%vec(:)=vec0(:)+(dt/2.0_f64)*(partmp%f1(:)+partmp%f2(:))
+             tmp%coords(1:2)=partmp%vec(1:2)
+             tmp%coords(3:4)=partmp%vec(4:5)
 !         tmp%coords(1:2)=tmp%coords(1:2)+0.5
 !         tmp%coords(3:4)=tmp%coords(3:4)+0.1 
  
-         tmp=>tmp%next
+             tmp=>tmp%next
+           end if
+           partmp=>partmp%next
          end if
-         partmp=>partmp%next
-      end if
-    end do
+       end do
 
 
 
- else if(rk4order==4) then
+     else if(rk4order==4) then
 
-    order=1
-    num=0
-    recnum=0
-    call  compute_f_of_points_in_orbit_ful2d(partlist,pic2d,order)
+        order=1
+        num=0
+        recnum=0
+        call  compute_f_of_points_in_orbit_ful2d(partlist,pic2d,order)
 
 
-    deallocate(inlist)
-    nullify(inlist)
-    allocate(inlist)
-    recnum=0
-    num=0
-    order=2
-    call sortposition_by_process_ful2d(num,recnum,partlist,inlist,pic2d,dt,order,rk4order,iter_num)
-    call compute_f_of_points_out_orbit_ful2d(num,numgr,recnum,inlist,partlist,pic2d,order,iter_num)
-    call compute_f_of_points_in_orbit_ful2d(partlist,pic2d,order)
+        deallocate(inlist)
+        nullify(inlist)
+        allocate(inlist)
+        recnum=0
+        num=0
+        order=2
+        call sortposition_by_process_ful2d(num,recnum,partlist,inlist,pic2d,dt,order,rk4order,iter_num)
+        call compute_f_of_points_out_orbit_ful2d(num,numgr,recnum,inlist,partlist,pic2d,order,iter_num)
+        call compute_f_of_points_in_orbit_ful2d(partlist,pic2d,order)
 
-    deallocate(inlist)
-    nullify(inlist)
-    allocate(inlist)
-    recnum=0
-    num=0
-    order=3
-    call sortposition_by_process_ful2d(num,recnum,partlist,inlist,pic2d,dt,order,rk4order,iter_num)
-    call compute_f_of_points_out_orbit_ful2d(num,numgr,recnum,inlist,partlist,pic2d,order,iter_num)
-    call compute_f_of_points_in_orbit_ful2d(partlist,pic2d,order)
+        deallocate(inlist)
+        nullify(inlist)
+        allocate(inlist)
+        recnum=0
+        num=0
+        order=3
+        call sortposition_by_process_ful2d(num,recnum,partlist,inlist,pic2d,dt,order,rk4order,iter_num)
+        call compute_f_of_points_out_orbit_ful2d(num,numgr,recnum,inlist,partlist,pic2d,order,iter_num)
+        call compute_f_of_points_in_orbit_ful2d(partlist,pic2d,order)
 
-    deallocate(inlist)
-    nullify(inlist)
-    allocate(inlist)
-    recnum=0
-    num=0
-    order=4
-    call sortposition_by_process_ful2d(num,recnum,partlist,inlist,pic2d,dt,order,rk4order,iter_num)
-    call compute_f_of_points_out_orbit_ful2d(num,numgr,recnum,inlist,partlist,pic2d,order,iter_num)
-    call compute_f_of_points_in_orbit_ful2d(partlist,pic2d,order)    
+        deallocate(inlist)
+        nullify(inlist)
+        allocate(inlist)
+        recnum=0
+        num=0
+        order=4
+        call sortposition_by_process_ful2d(num,recnum,partlist,inlist,pic2d,dt,order,rk4order,iter_num)
+        call compute_f_of_points_out_orbit_ful2d(num,numgr,recnum,inlist,partlist,pic2d,order,iter_num)
+        call compute_f_of_points_in_orbit_ful2d(partlist,pic2d,order)    
 
-    tmp=>ful2d_head
-    partmp=>partlist
-    do while(associated(tmp).and.associated(partmp))
-      if(.not.associated(partmp%next).or..not.associated(tmp%next)) then
-         exit
-      else
-         vec0(1:2)=partmp%coords(1:2)
-         vec0(4:5)=partmp%coords(3:4)
-         partmp%vec(:)=vec0(:)+(dt/6.0_f64)*(partmp%f1(:)+2.0_f64*partmp%f2(:)+2.0_f64*partmp%f3(:) & 
+        tmp=>ful2d_head
+        partmp=>partlist
+        do while(associated(tmp).and.associated(partmp))
+          if(.not.associated(partmp%next).or..not.associated(tmp%next)) then
+            exit
+          else
+            vec0(1:2)=partmp%coords(1:2)
+            vec0(4:5)=partmp%coords(3:4)
+            partmp%vec(:)=vec0(:)+(dt/6.0_f64)*(partmp%f1(:)+2.0_f64*partmp%f2(:)+2.0_f64*partmp%f3(:) & 
                        +partmp%f4(:))
-!print*,"rank=",rank,partmp%vec 
-         tmp%coords(1:2)=partmp%vec(1:2)
-         tmp%coords(3:4)=partmp%vec(4:5)
-         tmp=>tmp%next
-         partmp=>partmp%next 
-      end if
-    end do
+!            print*,"dvec=", (dt/6.0_f64)*(partmp%f1(:)+2.0_f64*partmp%f2(:)+2.0_f64*partmp%f3(:) &
+!                       +partmp%f4(:)) 
+!            print*, tmp%coords(1:2)
+!            print*, "f1=",partmp%f1(1:2)
+!            print*, "f2=",partmp%f2(1:2)
+!            print*, "f3=",partmp%f3(1:2)
+!            print*, "f4=",partmp%f4(1:2)
+            tmp%coords(1:2)=partmp%vec(1:2)
+            tmp%coords(3:4)=partmp%vec(4:5)
+            tmp=>tmp%next
+            partmp=>partmp%next 
+          end if
+        end do
 
-end if !!! end the rk4order choice
+     end if !!! end the rk4order choice
 
     deallocate(recnum,num,inlist,partlist)
     nullify(partlist)
@@ -501,9 +516,9 @@ end if !!! end the rk4order choice
                   else if(order==2) then
                     call fulrkfunc_f_per_per(partmp%f2(1:6),partmp%vec(1:6),elef(1:3),magf(1:3))
                   else if(order==3) then
-                     call fulrkfunc_f_per_per(partmp%f3,partmp%vec,elef,magf)
+                     call fulrkfunc_f_per_per(partmp%f3(1:6),partmp%vec(1:6),elef,magf)
                   else if(order==4) then
-                     call fulrkfunc_f_per_per(partmp%f4,partmp%vec,elef,magf)
+                     call fulrkfunc_f_per_per(partmp%f4(1:6),partmp%vec(1:6),elef,magf)
                   end if         
                end if
                partmp=>partmp%next   
@@ -1235,6 +1250,11 @@ end if !!! end the rk4order choice
           sendtmp(i)%ptr=>outhead(i)%ptr
        end do
        allocate(rcounts(0:size-1),scounts(0:size-1),sdispls(0:size-1),rdispls(0:size-1),rbuf0(0:size-1))
+       rcounts=0
+       scounts=0
+       sdispls=0
+       rdispls=0
+       rbuf0=0
        call mpi_alltoall(num,1,mpi_integer,rbuf0,1,mpi_integer,comm,ierr)
        numrecv=rbuf0  !!!????
        numrecv(rank)=0
@@ -1325,6 +1345,12 @@ subroutine mpi2d_alltoallv_send_points_orbit_gy2d(num,numgr,numrecv,outhead,poin
   end do
   allocate(rcounts(0:size-1),scounts(0:size-1),sdispls(0:size-1),rdispls(0:size-1), &
            rbuf0(0:size-1),numrecv(0:size-1))
+  rcounts=0
+  scounts=0
+  sdispls=0
+  rdispls=0
+  rbuf0=0
+  numrecv=0
   call mpi_alltoall(num,1,mpi_integer,rbuf0,1,mpi_integer,comm,ierr)
 
   numrecv=rbuf0

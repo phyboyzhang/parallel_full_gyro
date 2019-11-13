@@ -495,6 +495,7 @@ contains
      int4 :: i,numout,ierr
 
      allocate(rcountmp(0:size-1))
+    rcountmp=0
     call mpi_alltoall(num,1,mpi_integer,rcountmp,1,mpi_integer,comm,ierr)
     numsend=0
     do i=0,size-1
@@ -634,6 +635,7 @@ contains
   
      root=0
      allocate(rbuf(0:size-1))
+     rbuf=0
      call mpi_gather(numleft,1,mpi_integer,rbuf,1,mpi_integer,root,comm,ierr)    
      call mpi_Bcast(rbuf,size,mpi_integer,root,comm,ierr)
 !print*, "rbuf=",rbuf

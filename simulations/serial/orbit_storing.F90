@@ -43,8 +43,8 @@ contains
    real8 :: vperp, rholength, gc(3)
 
    write(unit=char_a,fmt=*) n
-   char_b="/PARA/blsc950/electrostatic_exp/run/borisorbit_be_"
-   char_f="/PARA/blsc950/electrostatic_exp/run/borisorbit_gc_"
+   char_b="/home/qmlu/zsx163/parallel_full_gyro/run/orbit/borisorbit_be_"
+   char_f="/home/qmlu/zsx163/parallel_full_gyro/run/orbit/borisorbit_gc_"
  !   char_b="/Users/zhang/program/debug/electrostatic_exp/run/borisorbit_be_"
  !  char_f="/Users/zhang/program/debug/electrostatic_exp/run/borisorbit_gc_"
    
@@ -150,7 +150,7 @@ subroutine borisrun_anal(x,v, &
   int4 :: i
 
    write(unit=char_a,fmt=*) n
-   char_d="/PARA/blsc950/electrostatic_exp/run/borisorbit_anal_"  
+   char_d="/home/qmlu/zsx163/parallel_full_gyro/run/orbit/borisorbit_anal_"  
 !   char_d="/Users/zhang/program/debug/electrostatic_exp/run/borisorbit_anal_"  
    open(30,file=trim(char_d)//trim(geometry)//trim(adjustl(char_a))//".txt",status='replace')
   do i=1, n
@@ -202,8 +202,8 @@ end subroutine borisrun_anal
    real8 :: vperp, rholength, gc(3), time 
 
    write(unit=char_a,fmt=*) n
-   char_b="/PARA/blsc950/electrostatic_exp/run/fulrkorbit_be_"
-   char_f="/PARA/blsc950/electrostatic_exp/run/fulrkorbit_gc_"
+   char_b="/home/qmlu/zsx163/parallel_full_gyro/run/orbit/fulrkorbit_be_"
+   char_f="/home/qmlu/zsx163/parallel_full_gyro/run/orbit/fulrkorbit_gc_"
 !    char_b="/Users/zhang/program/debug/electrostatic_exp/run/fulrkorbit_be_"
 !   char_f="/Users/zhang/program/debug/electrostatic_exp/run/fulrkorbit_gc_"
     
@@ -308,7 +308,7 @@ end subroutine borisrun_anal
 
 
    write(unit=char_a,fmt=*) n 
-   char_d="/PARA/blsc950/electrostatic_exp/run/fulrkorbit_anal_"
+   char_d="/home/qmlu/zsx163/parallel_full_gyro/run/orbit/fulrkorbit_anal_"
 ! char_d="/Users/zhang/program/debug/electrostatic_exp/run/fulrkorbit_anal_"
 
    open(20,file=trim(char_d)//trim(geometry)//trim(adjustl(char_a))//".txt",status='replace')
@@ -369,7 +369,7 @@ end subroutine borisrun_anal
 
    
    write(unit=char_a,fmt=*) n
-   char_b="/PARA/blsc950/electrostatic_exp/run/gyro_rkorbit_"
+   char_b="/home/qmlu/zsx163/parallel_full_gyro/run/orbit/gyro_rkorbit_"
 !  char_b="/Users/zhang/program/debug/electrostatic_exp/run/gyro_rkorbit_"
 
    eta_min(1)=m_x1%eta_min

@@ -1,5 +1,6 @@
 module field_initialize
 #include "work_precision.h"
+  use constants, only: pi_
   use field_2d_mesh, only: field_2d_plan
   use cartesian_mesh, only: cartesian_mesh_1d
   use paradata_type, only: pic_para_total2d_base
@@ -10,7 +11,7 @@ module field_initialize
   implicit none
   include "mpif.h"
  
-  public :: &
+  public :: epotential_2d, &
        epotential_2d_analytical, &
        efield2d_anal, &
        compute_field_2d_mesh, &
@@ -19,7 +20,7 @@ module field_initialize
 
 contains
 
-   function epotential_2d_analytical(waveamplitude, &
+   function epotential_2d_analytical(wapone, &
                                     wavenumber_one,  &
                                     wavenumber_two,  &
                                     xmin, &
@@ -27,7 +28,7 @@ contains
                                     x) result(epo)   ! the fist kind of electric potential. k is the wave vector needing to be scanned
   real8, intent(in) :: x(2)
   real8 :: epo
-  real8, intent(in) :: waveamplitude, wavenumber_one, wavenumber_two 
+  real8, intent(in) :: wapone, wavenumber_one, wavenumber_two 
   real8, intent(in) :: xmin(2),xmax(2)
   real8 :: xmid,y
 !  call wavearray(input)
@@ -42,17 +43,63 @@ contains
 !>>>>>>> solverk4
 !       epo=waveamplitude*x(2)
   !    epo=waveamplitude
-  
-  xmid=(xmax(2)+xmin(2))/2.0_F64
-  if(x(2).le.xmid) then
-    y=x(2)-xmin(2)
-    epo=waveamplitude*(sin(wavenumber_one*x(1))+cos(wavenumber_two*x(2)))+waveamplitude*y/4.0
-  else 
-    y=xmid-(x(2)-xmid)
-    epo=waveamplitude*(sin(wavenumber_one*x(1))+cos(wavenumber_two*x(2)))+waveamplitude*y/4.0
-  end if 
+
+   xmid=(xmax(2)+xmin(2))/2.0_F64
+   if(x(2).le.xmid) then
+     y=x(2)-xmin(2)
+     epo=wapone*(sin(wavenumber_one*x(1))+cos(wavenumber_two*x(2)))+wapone*y/4.0
+   else 
+     y=xmid-(x(2)-xmid)
+     epo=wapone*(sin(wavenumber_one*x(1))+cos(wavenumber_two*x(2)))+wapone*y/4.0
+   end if 
+
      return
    end function epotential_2d_analytical
+
+
+   function epotential_2d(wapone,wapeq, &
+                                    wavenumber_one,  &
+                                    wavenumber_two,  &
+                                    xmin, &
+                                    xmax, &
+                                    x,epkind) result(epo)   ! the fist kind of electric potential. k is the wave vector needing to be scanned
+        real8, intent(in) :: x(2)
+        character(len=*) :: epkind
+        real8 :: epo
+        real8, intent(in) :: wapone,wapeq, wavenumber_one, wavenumber_two 
+        real8, intent(in) :: xmin(2),xmax(2)
+        real8 :: xmid,y
+        !  call wavearray(input)
+        !    epo=waveamplitude*sin(wavenumber_one*x(1))*cos(wavenumber_two*x(2))
+        !    efi(2)=input(2,2)*sin(input(1,2)*x(1))*cos(input(1,2)*x(2)) 
+        !     epo=waveamplitude*sin(wavenumber_one*x(1))*cos(wavenumber_two*x(2))
+! epo=waveamplitude*(sin(wavenumber_one*x(1))+cos(wavenumber_two*x(2)))
+        !<<<<<<< HEAD
+        !  epo=waveamplitude*(sin(wavenumber_one*x(1))+cos(wavenumber_two*x(2)))+waveamplitude*(x(1))/4.0
+        !=======
+        !  epo=waveamplitude*(sin(wavenumber_one*x(1))+cos(wavenumber_two*x(2)))+waveamplitude*(x(2)+x(1))/4.0
+        !>>>>>>> solverk4
+!       epo=waveamplitude*x(2)
+        !    epo=waveamplitude
+        if(epkind=="eqp_linear")  then
+          xmid=(xmax(2)+xmin(2))/2.0_F64
+            if(x(2).le.xmid) then
+              y=x(2)-xmin(2)
+              epo=wapone*(sin(wavenumber_one*x(1))+cos(wavenumber_two*x(2)))+wapeq*y/4.0
+            else 
+              y=xmid-(x(2)-xmid)
+              epo=wapone*(sin(wavenumber_one*x(1))+cos(wavenumber_two*x(2)))+wapeq*y/4.0
+            end if 
+        else if(epkind=="eqp_sin") then
+          xmid=(xmax(2)+xmin(2))/2.0_F64
+          epo=wapone*(sin(wavenumber_one*x(1))+cos(wavenumber_two*x(2)))+wapeq*sin(pi_/xmid*(x(2)-xmid))
+        end if
+
+        return
+   end function epotential_2d
+
+
+
 
    subroutine efield2d_anal(efi,waveamplitude, &
                                     wavenumber_one,  &
@@ -114,9 +161,9 @@ contains
          x(2)=0.0_f64
           do j=0,m_x2%nodes-1
             x(2)=x(2)+m_x2%delta_eta
-           field_2d%epotential_init(i+1,j+1) = epotential_2d_analytical(amp,wave_one, &
-                wave_two,xmin,xmax, x)
-!           field_2d%epotential_init(i+1,j+1) = x(2)
+!           field_2d%epotential_init(i+1,j+1) = epotential_2d_analytical(amp,wave_one, &
+!                wave_two,xmin,xmax, x)
+           field_2d%epotential_init(i+1,j+1) = 1.0
  
 
           field_2d%Bf_init_3rd(i+1,j+1)=1.0
@@ -177,14 +224,16 @@ contains
   end subroutine magfield_2d_interpolation_point  
   
 
-  subroutine para_initialize_field_2d_mesh(amp,wave_one, wave_two, pic2d)
+  subroutine para_initialize_field_2d_mesh(amp,amp_eq,wave_one, wave_two, pic2d)
       class(pic_para_total2d_base), pointer,intent(inout) :: pic2d
-      real8, intent(in) :: amp,wave_one,wave_two
+      real8, intent(in) :: amp,amp_eq,wave_one,wave_two
 !      real8, intent(in) :: contr
       character(25) :: geometry,boundary
       real8 :: x(2),x1(2),delta(2),xmin(2),xmax(2)
       int4 :: ND(2),rank,global_sz(2),comm,coords(2),numproc(2)
       int4 :: i, j
+  
+      character(25) :: epkind="eqp_sin"
 
       comm=pic2d%layout2d%collective%comm
       numproc=pic2d%para2d%numproc
@@ -203,33 +252,33 @@ contains
     select case (geometry)
       case ("cartesian")
         select case (boundary)  ! for double_per, Bf=1.0
-          case ("double_per")    
+          case ("double_per")   
             if(coords(1)==numproc(1)-1.and.coords(2).ne.numproc(2)-1) then
               do j=1, ND(2)
                  do i=1, ND(1)-1
                     x(1:2)=coords_from_localind((/i,j/),rank,pic2d%para2d%gboxmin,delta)
-                    pic2d%field2d%ep(i,j)=epotential_2d_analytical(amp,wave_one,wave_two,xmin,xmax, x)
+                    pic2d%field2d%ep(i,j)=epotential_2d(amp,amp_eq,wave_one,wave_two,xmin,xmax, x,epkind)
                  end do
              end do              
             else if(coords(1).ne.numproc(1)-1.and.coords(2)==numproc(2)-1) then
               do j=1, ND(2)-1
                  do i=1, ND(1)
                     x(1:2)=coords_from_localind((/i,j/),rank,pic2d%para2d%gboxmin,delta)
-                    pic2d%field2d%ep(i,j)=epotential_2d_analytical(amp,wave_one,wave_two,xmin,xmax,x)              
+                    pic2d%field2d%ep(i,j)=epotential_2d(amp,amp_eq,wave_one,wave_two,xmin,xmax,x,epkind)              
                  end do
               end do
             else if(coords(1)==numproc(1)-1.and.coords(2)==numproc(2)-1)   then
                do j=1,ND(2)-1
                   do i=1,Nd(1)-1
                     x(1:2)=coords_from_localind((/i,j/),rank,pic2d%para2d%gboxmin,delta)
-                    pic2d%field2d%ep(i,j)=epotential_2d_analytical(amp,wave_one,wave_two,xmin,xmax,x)
+                    pic2d%field2d%ep(i,j)=epotential_2d(amp,amp_eq,wave_one,wave_two,xmin,xmax,x,epkind)
                   end do
                end do
             else
                do j=1,ND(2)
                   do i=1,Nd(1)
                     x(1:2)=coords_from_localind((/i,j/),rank,pic2d%para2d%gboxmin,delta)
-                    pic2d%field2d%ep(i,j)=epotential_2d_analytical(amp,wave_one,wave_two,xmin,xmax,x)
+                    pic2d%field2d%ep(i,j)=epotential_2d(amp,amp_eq,wave_one,wave_two,xmin,xmax,x,epkind)
                   end do
                end do
             end if                           
