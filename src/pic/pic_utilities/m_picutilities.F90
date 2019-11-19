@@ -1018,6 +1018,10 @@ contains
        rankcur(i)%ptr=>tp_gy2dsend_head(i)%ptr
     end do    
     allocate(rcounts(0:size-1),scounts(0:size-1),sdispls(0:size-1),rdispls(0:size-1))
+   rcounts=0
+   scounts=0
+   sdispls=0
+   rdispls=0
    call mpi_alltoall(num,1,mpi_integer,rcounts,1,mpi_integer,comm,ierr) 
    nums=0 
    do i=0,size-1
@@ -1135,6 +1139,7 @@ contains
 
    deallocate(rankcur)
    nullify(coordcur)
+   deallocate(rcounts,scounts,rdispls,sdispls)
    end subroutine tp_mpi2d_alltoallv_send_particle_2d_gy
 
 

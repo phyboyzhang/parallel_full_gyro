@@ -109,11 +109,11 @@ contains
 !!!!!! HERE, numger=5
       if(rank==0) then
         do i=0,numtot/numgr-1
-          outarrayone((numgr+1)*i+1:(numgr+2)*i+4)=outarray(numgr*i+1:numgr*i+4)
-          vperp=sqrt(outarray(numgr*i+3)**2+outarray(numgr*i+4)**2)
+          outarrayone((numgr+1)*i+1:(numgr+1)*i+4)=outarray((numgr-1)*i+1:(numgr-1)*i+4)
+          vperp=sqrt(outarray((numgr-1)*i+3)**2+outarray((numgr-1)*i+4)**2)
           rholength=vperp
-          outarrayone((numgr+1)*i+5)=outarray(numgr*i+1)+rholength*outarray(numgr*i+4)/vperp
-          outarrayone((numgr+1)*i+6)=outarray(numgr*i+2)-rholength*outarray(numgr*i+3)/vperp          
+          outarrayone((numgr+1)*i+5)=outarray((numgr-1)*i+1)+rholength*outarray((numgr-1)*i+4)/vperp
+          outarrayone((numgr+1)*i+6)=outarray((numgr-1)*i+2)-rholength*outarray((numgr-1)*i+3)/vperp          
         end do 
 
          write(fileitem, *) iter_num,outarrayone(:)

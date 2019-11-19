@@ -232,12 +232,12 @@ contains
 
   end subroutine
 
-  subroutine advance_particles_among_ranks_gy(gy2d_head,pic2d)
+  subroutine advance_particles_among_ranks_gy(gy2d_head,pic2d,iter_num)
     class(pic_para_total2d_base), pointer :: pic2d 
     class(gy2d_node), pointer, intent(inout) :: gy2d_head
-!    int4,intent(in) :: numleft
+    int4,intent(in) :: iter_num
 
-    call gyrork4solve(gy2d_head,pic2d)
+    call gyrork4solve(gy2d_head,pic2d,iter_num)
 
   end subroutine
 

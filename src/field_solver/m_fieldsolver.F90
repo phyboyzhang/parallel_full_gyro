@@ -13,6 +13,9 @@ public :: solve_weight_of_field_among_processes
 
 contains
 
+  !!! This subroutine is used to solve the weight of field. First, gather
+  !field data to the root process. Then, obtain the weight coefficient. Last,
+  !scatter all weight to each process. 
     subroutine solve_weight_of_field_among_processes(boxfield,rootmatrix,rootdata,pic2d,boxweight, &
                rw,re,rn,rs,rsw,rse,rnw,rne)
       real8,dimension(:,:), pointer, intent(in) :: boxfield

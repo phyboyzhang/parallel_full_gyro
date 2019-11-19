@@ -15,5 +15,5 @@ Target_Link_Libraries(test_com_natper meshes interpolation)
         #Target_Link_Libraries(test_interpotwo interpolation)
 
 ADD_EXECUTABLE(test_para_interpolation test_para_interpolation.F90)
-Target_Link_Libraries(test_para_interpolation meshes interpolation
+Target_Link_Libraries(test_para_interpolation constants meshes interpolation
                  parautilities piclayout mpilayout paradata_type paradata_layout)

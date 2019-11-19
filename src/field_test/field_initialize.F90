@@ -68,7 +68,7 @@ contains
         real8 :: epo
         real8, intent(in) :: wapone,wapeq, wavenumber_one, wavenumber_two 
         real8, intent(in) :: xmin(2),xmax(2)
-        real8 :: xmid,y
+        real8 :: xmid,y,xx
         !  call wavearray(input)
         !    epo=waveamplitude*sin(wavenumber_one*x(1))*cos(wavenumber_two*x(2))
         !    efi(2)=input(2,2)*sin(input(1,2)*x(1))*cos(input(1,2)*x(2)) 
@@ -82,17 +82,19 @@ contains
 !       epo=waveamplitude*x(2)
         !    epo=waveamplitude
         if(epkind=="eqp_linear")  then
-          xmid=(xmax(2)+xmin(2))/2.0_F64
-            if(x(2).le.xmid) then
-              y=x(2)-xmin(2)
+          xmid=(xmax(1)+xmin(1))/2.0_F64
+            if(x(1).le.xmid) then
+              y=x(1)-xmin(1)
               epo=wapone*(sin(wavenumber_one*x(1))+cos(wavenumber_two*x(2)))+wapeq*y/4.0
             else 
-              y=xmid-(x(2)-xmid)
+              y=xmid-(x(1)-xmid)
               epo=wapone*(sin(wavenumber_one*x(1))+cos(wavenumber_two*x(2)))+wapeq*y/4.0
             end if 
         else if(epkind=="eqp_sin") then
-          xmid=(xmax(2)+xmin(2))/2.0_F64
-          epo=wapone*(sin(wavenumber_one*x(1))+cos(wavenumber_two*x(2)))+wapeq*sin(pi_/xmid*(x(2)-xmid))
+          xmid=(xmax(1)+xmin(1))/2.0_F64
+!          epo=wapone*(sin(wavenumber_one*x(1))+cos(wavenumber_two*x(2)))+wapeq*sin(pi_/xmid*(x(1)-xmid))
+          epo=wapone*sin(wavenumber_one*x(1))+wapeq*sin(pi_/xmid*(x(2)-xmid))
+ 
         end if
 
         return
@@ -234,6 +236,8 @@ contains
       int4 :: i, j
   
       character(25) :: epkind="eqp_sin"
+!      character(25) :: epkind="eqp_linear"
+
 
       comm=pic2d%layout2d%collective%comm
       numproc=pic2d%para2d%numproc

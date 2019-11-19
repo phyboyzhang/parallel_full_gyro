@@ -301,14 +301,14 @@ contains
     int4, intent(in) :: num_proc_x1
     int4, intent(in) :: num_proc_x2
     character(len=*), intent(in) :: boundary
-    type(t_layout_2d), pointer :: layout
+    type(t_layout_2d), pointer,intent(inout) :: layout
     int4 :: i,j
     int4 :: total_num_processors
     int4 :: node
     int4 :: collective_size
     int4 :: ierr
-    int4, dimension(:,:), allocatable :: box1d1
-    int4, dimension(:,:), allocatable :: box1d2
+    int4, dimension(:,:), pointer :: box1d1
+    int4, dimension(:,:), pointer :: box1d2
 
     int4 :: i_min
     int4 :: i_max
@@ -386,7 +386,6 @@ contains
          
        end do
     end do   
-
     
     DEALLOCATE( box1d1, stat=err )
     DEALLOCATE( box1d2, stat=err )

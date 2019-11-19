@@ -87,14 +87,15 @@ contains
 
 
        call tp_gy_solve(tp_gy2d_head,pic2d,numleft,rk4order,iter_num)
+
 !if(iter_num==4) then
-!tpful2dtmp=>tp_ful2d_head
-!do while(associated(tpful2dtmp)) 
-!   if(.not.associated(tpful2dtmp%next)) then
+!tpgy2dtmp=>tp_gy2d_head
+!do while(associated(tpgy2dtmp)) 
+!   if(.not.associated(tpgy2dtmp%next)) then
 !      exit
 !   else
-!      print*, "rank1=",rank,"coords1=",tpful2dtmp%coords(1:4)
-!      tpful2dtmp=>tpful2dtmp%next
+!      print*, "rank1=",rank,"coords1=",tpgy2dtmp%coords(1:3)
+!      tpgy2dtmp=>tpgy2dtmp%next
 !   end if
 !end do
 !end if
@@ -207,7 +208,7 @@ contains
        end if 
 
        call tp_gy2dlist_to_gy2dlist(gy2d_head,tp_gy2d_head)
-       call gyrork4solve(gy2d_head,pic2d)
+       call gyrork4solve(gy2d_head,pic2d,iter_num)
        call gy2dlist_to_tp_gy2dlist(tp_gy2d_head,gy2d_head,rank)
        deallocate(gy2d_head)
        nullify(gy2d_head)

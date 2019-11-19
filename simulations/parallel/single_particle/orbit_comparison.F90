@@ -129,7 +129,7 @@ include "mpif.h"
 !   int4 :: row,prank,size,numgr,rank
    int4, dimension(:), pointer :: num,recnum
    real8 :: vec(6),dt
-   int4 :: order,h
+   int4 :: order,h,num_time
 
 !!! Test test_particles
    class(tp_ful2d_node), pointer :: tpful2d_head,tpful2dtmp,tprk4ful2d_head,tprk4ful2dtmp
@@ -141,7 +141,7 @@ include "mpif.h"
    character(25) :: pushkind
    int4, dimension(:), pointer :: num_rk4,num_gy
    real8 :: rho, theta,x2(2)
-   int4 :: rk4order
+   int4 :: rk4order,cell_per_unit(2)
    int4 :: orbit_field=1
 
     allocate(weight(-1:2,-1:2))
@@ -170,17 +170,17 @@ include "mpif.h"
     pic2d=> initialize_pic_para_total2d_base(size)
 !!! initialize parameter_2d_sets
     pic2d%para2d%gxmin=(/0.0,0.0/)
-    pic2d%para2d%gxmax=(/15.0,15.0/)
-    pic2d%para2d%N_points=3
+    pic2d%para2d%gxmax=(/2.0*pi_,2.0*pi_/)
+    pic2d%para2d%N_points=50
     pic2d%para2d%iter_number=100
     pic2d%para2d%numcircle=3
     pic2d%para2d%dtgy=1.0
     pic2d%para2d%num_time=15
     pic2d%para2d%boundary="double_per"
     pic2d%para2d%geometry="cartesian"
-    pic2d%para2d%mu=0.1
+    pic2d%para2d%mu=0.3
     pic2d%para2d%row=3
-    pic2d%para2d%cell_per_unit=(/10,10/) 
+    pic2d%para2d%cell_per_unit=(/30,30/) 
     pic2d%para2d%dtful=pic2d%para2d%dtgy/real(pic2d%para2d%num_time,8)
     !!! particle in cell part
     pic2d%para2d%sigma = 1.0
@@ -189,14 +189,12 @@ include "mpif.h"
     pic2d%para2d%mumax=20._F64
     pic2d%para2d%gyroorder=1
     row=pic2d%para2d%row
-    amp=0.001
+    amp=0.01
     amp_eq=0.01
-    wave_one=1.0
-    wave_two=1.0
-
-    do i=1,2
-       delta(i)=1._f64/real(pic2d%para2d%cell_per_unit(i),8)
-    end do
+    wave_one=8.0
+    wave_two=8.0
+    num_time=pic2d%para2d%num_time
+    cell_per_unit=pic2d%para2d%cell_per_unit
 
     !!! initialize layout2d      
     pic2d%layout2d%collective%thread_level_provided=1
@@ -206,10 +204,15 @@ include "mpif.h"
     pic2d%para2d%numproc=NINT(sqrt(real(size,8)))
     numproc=pic2d%para2d%numproc 
     comm=pic2d%layout2d%collective%comm
- 
+
     do i=1,2
-       global_sz(i)=pic2d%para2d%cell_per_unit(i)*(pic2d%para2d%gxmax(i)-pic2d%para2d%gxmin(i))+1
+       delta(i)=pic2d%para2d%gxmax(i)/real(cell_per_unit(i)*numproc(i),8)
     end do
+
+    do i=1,2
+       global_sz(i)=pic2d%para2d%cell_per_unit(i)*numproc(i)+1
+    end do 
+
 
     call initialize_layout_with_distributed_2d_array( &
       global_sz(1), &
@@ -280,13 +283,15 @@ end if
   do i=1,dimsize(1)
     do j=1, dimsize(2)
        globalind=globalind_from_localind_2d((/i,j/),pic2d%para2d%numproc,rank,pic2d%layout2d,pic2d%para2d%boundary)
-       pic2d%field2d%ep(i,j)=1.0    ! real(globalind(1)+globalind(2), 8)
+       pic2d%field2d%ep(i,j)=real(globalind(2),8)*0.1    ! real(globalind(1)+globalind(2), 8)
        pic2d%field2d%Bf03(i,j)=1.0
     end do
   end do
   else
     call para_initialize_field_2d_mesh(amp,amp_eq,wave_one,wave_two, pic2d) 
   endif
+
+  !  call para_compute_gyroaverage_mesh_field(pic2d%para2d%mu,1,pic2d)
 
   if(rank==0) then
     call compute_D_spl2D_per_per_noblock( &
@@ -298,6 +303,13 @@ end if
        pic2d%field2d%ep_weight, pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n, &
        pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
        pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
+  
+  call para_compute_gyroaverage_mesh_field(pic2d%para2d%mu,1,pic2d)
+print*, rank
+  call solve_weight_of_field_among_processes(pic2d%field2d%epgyro,rootdata%ASPL,rootdata,pic2d, &
+       pic2d%field2d%epgy_weight, pic2d%field2d%epgywg_w,pic2d%field2d%epgywg_e,pic2d%field2d%epgywg_n, &
+       pic2d%field2d%epgywg_s, pic2d%field2d%epgywg_sw,pic2d%field2d%epgywg_se, &
+       pic2d%field2d%epgywg_nw,pic2d%field2d%epgywg_ne)
 
   call solve_weight_of_field_among_processes(pic2d%field2d%Bf03,rootdata%ASPL,rootdata,pic2d, &
        pic2d%field2d%bf03wg, pic2d%field2d%BF03wg_w,pic2d%field2d%bf03wg_e,pic2d%field2d%bf03wg_n, &
@@ -358,8 +370,8 @@ end if
        theta=real(j,8)*2.0_f64*pi_/real(numcircle,8)
        coords(1)=x1(1)+rho*cos(theta)
        coords(2)=x1(2)+rho*sin(theta)
-       coords(3)=rho*cos(theta+pi_/2.0_f64)
-       coords(4)=rho*sin(theta+pi_/2.0_f64)
+       coords(3)=-rho*cos(theta+pi_/2.0_f64)
+       coords(4)=-rho*sin(theta+pi_/2.0_f64)
 !print*, "coords=",coords(1:4)
 !       call coordinates_pointoutbound_per_per(coords(1:2),pic2d)
        rank1=compute_process_of_point_per_per(coords(1:2),pic2d%para2d%numproc,pic2d%para2d%gxmin,&
@@ -462,19 +474,20 @@ end if
 !print*, "rank2=",rank,num_p
 rk4order=4
 
-     do i=1, 10000
+     do i=1, 1000
 if(rank==0) then
 print*, "#i=",i
 end if
-         call tp_push_ful_orbit(tpful2d_head,numleft_boris,numgr,pic2d,"boris",rk4order,i)
-         call tp_push_ful_orbit(tprk4ful2d_head,numleft_rk4,numgr,pic2d,"rk4", rk4order,i)
-         call tp_push_gy_orbit(tpgy2d_head,numleft_gy,numgr_gy,pic2d,rk4order,i) 
+        do j=1,pic2d%para2d%num_time 
+           call tp_push_ful_orbit(tpful2d_head,numleft_boris,numgr,pic2d,"boris",rk4order,(i-1)*num_time+j)
+           call tp_push_ful_orbit(tprk4ful2d_head,numleft_rk4,numgr,pic2d,"rk4", rk4order,(i-1)*num_time+j)
+           call para_write_orbit_file_2d(tpful2d_head,numleft_boris,numgr,fileitem_boris,pic2d,(i-1)*num_time+j) 
+           call para_write_orbit_file_2d(tprk4ful2d_head,numleft_rk4,numgr,fileitem_rk4,pic2d, (i-1)*num_time+j)
+        end do
+        call tp_push_gy_orbit(tpgy2d_head,numleft_gy,numgr_gy,pic2d,rk4order,i) 
+        call para_write_orbit_file_2d_gy(tpgy2d_head,numleft_gy,numgr_gy,fileitem_gy,pic2d,i)
 
-         call para_write_orbit_file_2d(tpful2d_head,numleft_boris,numgr,fileitem_boris,pic2d,i) 
-         call para_write_orbit_file_2d(tprk4ful2d_head,numleft_rk4,numgr,fileitem_rk4,pic2d,i)
-         call para_write_orbit_file_2d_gy(tpgy2d_head,numleft_gy,numgr_gy,fileitem_gy,pic2d,i)
-call mpi_barrier(pic2d%layout2d%collective%comm)
-     end do
+    end do
 
      call close_file(fileitem_boris,rank)
      call close_file(fileitem_rk4,rank)

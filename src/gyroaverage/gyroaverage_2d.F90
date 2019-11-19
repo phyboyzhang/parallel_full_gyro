@@ -232,6 +232,7 @@ use utilities_module, only: gp_error
        type(gyroaverage_2d_plan), pointer, intent(in) ::  gyro
        class(field_2d_plan),pointer,intent(in) :: field_2d
        class(cartesian_mesh_1d), pointer,intent(in) :: m_x1, m_x2
+       real8, dimension(:,:), pointer :: points
        real8, intent(in) :: mu
        real8, dimension(2),intent(in) :: x1
        character(len=*),intent(in), optional :: gyroaverage
@@ -239,11 +240,12 @@ use utilities_module, only: gp_error
        real8 :: pafter
        real8 :: rho
        int4 :: i,j, k
-       real8 :: points(3,gyro%N_points) 
+!       real8 :: points(3,gyro%N_points) 
        real8 :: x(2),eta_min(2),eta_max(2),eta_star(2)
        int4 :: ii(2), Nc(2), flag, ind(2), ell_1, ell_2
        real8 :: val(-1:2,-1:2)
 
+       allocate(points(3,gyro%N_points))
        call s_compute_shape_circle(points,gyro%N_points)
     
        Nc(1) = m_x1%nodes
@@ -364,12 +366,14 @@ use utilities_module, only: gp_error
        real8 :: pafter
        real8 :: rho
        int4 :: i,j, k
-       real8 :: points(3,gyro%N_points)
+       real8, dimension(:,:),pointer :: points
+!       real8 :: points(3,gyro%N_points)
        real8 :: polar1(2),eta_min(2),eta_max(2),eta_star(2)
        real8 :: x(2)
        int4 :: ii(2), Nc(2), flag, ind(2), ell_1, ell_2
        real8 :: val(-1:2,-1:2)
-      
+ 
+       allocate(points(3,gyro%N_points))     
        pafter=0._f64
        call s_compute_shape_circle(points,gyro%N_points)
     

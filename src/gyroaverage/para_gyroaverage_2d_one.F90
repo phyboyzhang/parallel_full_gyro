@@ -29,19 +29,17 @@ use paradata_utilities, only: compute_process_of_point_per_per, &
                               coordinates_pointoutbound_per_per, &
                               globalind_from_localind_2d, &
                               startind_of_process, &
-                              point_location_for_cubic_spline_2d
-                              
+                              point_location_for_cubic_spline_2d, &
+                              get_coords_from_processrank, &
+                              copy_boundary_value_per_per, &
+                              get_rank_from_processcoords
 
 implicit none
 include "mpif.h"
 
   public :: sort_quadraturepoint_among_process, &
             para_compute_gyroaverage_stiff_matrix, &
-            para_compute_gyroaverage_mesh_field, &
-            muarray_euler_maclaurin_choice
-!            store_data_on_rootprocess,  &
-!            precompute_doublegyroaverage_matrix
-
+            para_compute_gyroaverage_mesh_field
 
 contains
 
@@ -233,18 +231,22 @@ contains
      class(gyropoint_node),dimension(:), pointer,intent(inout) :: pointhead
      class(gyropoint_node),dimension(:), pointer :: curpoint
      int4, dimension(:),pointer, intent(inout) :: num_p
-     real(8), dimension(:,:), allocatable :: points
+     real(8), dimension(:,:), pointer :: points
      real8 :: rho,x1(2),x(2)
      real8 :: gxmin(2),gxmax(2)
-     int4 :: num_mu,i,j,k,h,m,rankpoint,size
-     int4 :: NC(2),flag     
+     int4 :: num_mu,i,j,k,h,m,rankpoint,size,numproc(2)
+     int4 :: NC(2),flag,comm
+     int4 :: tot=0
 
   !   num_mu=size(mu)
      Nc(1) = pic2d%para2d%m_x1%nodes
      Nc(2) = pic2d%para2d%m_x2%nodes
+     numproc=pic2d%para2d%numproc
      size=pic2d%layout2d%collective%size  
-     allocate(points(N_points,3))
+     comm=pic2d%layout2d%collective%comm
+     allocate(points(3,N_points))
      allocate(curpoint(0:size-1))
+  
      rho=sqrt(2.0*mu)
      do i=0, size-1 
        if(.not.associated(pointhead(i)%ptr)) then
@@ -252,19 +254,18 @@ contains
           stop
        end if
        curpoint(i)%ptr=>pointhead(i)%ptr
-     end do
-
-    
+     end do    
   call s_compute_shape_circle(points,N_points)
-!  h=0
+
   select case(pic2d%para2d%geometry)
     case ("cartesian")  
     select case(pic2d%para2d%boundary)
      case("nat_per")    
   !   do m=1,num_mu
+   
      do i=1, Nc(1)
        x1(1)=pic2d%para2d%gboxmin(rank,1)+real(i-1,8)*pic2d%para2d%m_x1%delta_eta
-       do j=1, Nc(2) 
+       do j=1, Nc(2)-1 
          x1(2)=pic2d%para2d%gboxmin(rank,2)+real(j-1,8)*pic2d%para2d%m_x2%delta_eta
              do k=1,N_points
                flag=1
@@ -282,7 +283,7 @@ contains
                if(.not.associated(curpoint(rankpoint)%ptr)) then
                   stop
                else 
-               curpoint(rankpoint)%ptr%gridrank=rank
+                curpoint(rankpoint)%ptr%gridrank=rank
                 curpoint(rankpoint)%ptr%gridind(i)=i
                 curpoint(rankpoint)%ptr%gridind(j)=j
                 curpoint(rankpoint)%ptr%xpoint=(/x(1),x(2)/)
@@ -298,17 +299,24 @@ contains
 
      case ("double_per")
  !    do m=1,num_mu
-     do i=1, Nc(1)
+     do i=1, Nc(1)-1
          x1(1)=pic2d%para2d%gboxmin(rank,1)+real(i-1,8)*pic2d%para2d%m_x1%delta_eta 
-         do j=1, Nc(2) 
+         do j=1, Nc(2)-1 
             x1(2)=pic2d%para2d%gboxmin(rank,2)+real(j-1,8)*pic2d%para2d%m_x2%delta_eta
             do k=1,N_points
                flag=1
                x(1) = x1(1)+rho*points(1,k)
                x(2) = x1(2)+rho*points(2,k)
-               call coordinates_pointoutbound_per_per(x,pic2d%para2d%gxmin,pic2d%para2d%gxmax)
+ !              call coordinates_pointoutbound_per_per(x,pic2d%para2d%gxmin,pic2d%para2d%gxmax)
+! if(rank==1.and.i==1.and.j==1) then
+!print*, "x=",x
+!end if 
+
                rankpoint=compute_process_of_point_per_per(x,pic2d%para2d%numproc, &
                    pic2d%para2d%gxmin,pic2d%para2d%gxmax,pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)
+!if(rank==1.and.i==1.and.j==1) then
+!print*, "rankpoint=", rankpoint, "x=",x
+!end if 
                num_p(rankpoint)=num_p(rankpoint)+1 
                curpoint(rankpoint)%ptr%gridrank=rank
                curpoint(rankpoint)%ptr%gridind(1)=i
@@ -324,8 +332,14 @@ contains
             end do !!! end k 
         end do  !!! end j
       end do  !!! end i
- !    end do  !!! end m
-     case default
+!     do i=0, size-1
+!         tot=tot+num_p(i)       
+!      end do
+!    print*, "rank=",rank,tot
+
+!print*, "rank=",rank,"num_p=",num_p
+
+    case default
        stop
      end select
    
@@ -396,8 +410,7 @@ contains
 !enddo
 !end if 
 
-
-   call mpi_alltoall(num_p,1,mpi_integer,rbufone,1,mpi_integer,comm,ierr)
+  call mpi_alltoall(num_p,1,mpi_integer,rbufone,1,mpi_integer,comm,ierr)
     numsend=0
     numrecv=0
     do i=0,size-1
@@ -419,12 +432,6 @@ contains
 !    m=0
     do i=0, size-1
        do while(associated(curpoint(i)%ptr).and.associated(curpoint(i)%ptr%next))
-
-!if(myrank==3) then 
-!m=m+1      
-!print*, "i=",i,curpoint(i)%ptr%xpoint, curpoint(i)%ptr%gridind(1), &
-!            curpoint(i)%ptr%gridind(2),"m=",m
-!end if
           sbuf(5*h)=real(curpoint(i)%ptr%gridrank,8)
           sbuf(5*h+1:5*h+2)=curpoint(i)%ptr%xpoint
           sbuf(5*h+3)=real(curpoint(i)%ptr%gridind(1),8)
@@ -557,16 +564,16 @@ contains
             do l=-1,2
           !!!! Tell whether the the point which h denotes for is counted or not to avoid the repeated counting of points at 
           !!!! the boundary of each box.
-               IF(rootdata%ACONTRI(NINT(rbuf2nd(33*h)),NINT(rbuf2nd(33*h+4*(m+1)+l+2+16))).ne.0.or. &
-                  rootdata%ACONTRI(NINT(rbuf2nd(33*h)),NINT(rbuf2nd(33*h+4*(m+1+1)+l+1+2+16))).ne.0.or. &
-                  rootdata%ACONTRI(NINT(rbuf2nd(33*h)),NINT(rbuf2nd(33*h+4*(m+1+2)+l+2+2+16))).ne.0  ) then
-                  goto 100 
-               else
+!               IF(rootdata%ACONTRI(NINT(rbuf2nd(33*h)),NINT(rbuf2nd(33*h+4*(m+1)+l+2+16))).ne.0.or. &
+!                  rootdata%ACONTRI(NINT(rbuf2nd(33*h)),NINT(rbuf2nd(33*h+4*(m+1+1)+l+1+2+16))).ne.0.or. &
+!                  rootdata%ACONTRI(NINT(rbuf2nd(33*h)),NINT(rbuf2nd(33*h+4*(m+1+2)+l+2+2+16))).ne.0  ) then
+!                  goto 100 
+!               else
 
                   rootdata%ACONTRI(NINT(rbuf2nd(33*h)),NINT(rbuf2nd(33*h+4*(m+1)+l+2+16))) &
                   =rootdata%ACONTRI(NINT(rbuf2nd(33*h)),NINT(rbuf2nd(33*h+4*(m+1)+l+2+16))) &
                   +rbuf(33*h+4*(m+1)+l+2)
-               end if
+!               end if
             end do
          end do
 100    end do
@@ -576,36 +583,50 @@ contains
 
   !!! given the original field on the mesh,this subroutine is used to compute
   !the gyroaverage potential on the mesh
-  subroutine  para_compute_gyroaverage_mesh_field(num_p,mu,mu_num,pic2d) 
+  subroutine  para_compute_gyroaverage_mesh_field(mu,mu_num,pic2d) 
         class(pic_para_total2d_base), pointer,intent(inout) :: pic2d
         !  real8,dimension(:), intent(in) :: mu
         real8, intent(in) :: mu
         class(gyropoint_node),dimension(:), pointer :: pointhead,curpoint
-        int4, dimension(:), pointer,intent(inout) :: num_p
+  !      int4, dimension(:), pointer,intent(inout) :: num_p
         int4, intent(in) :: mu_num
         int4, dimension(:), pointer :: rcounts,scounts,sdispls,rdispls,rcountsone, &
         scountstwo,rcountstwo
         real8,dimension(:), pointer :: sbuf,rbuf
         real8, dimension(:), pointer :: sbuf2nd,rbuf2nd
         int4 :: size,ierr,numout,comm
-        int4 :: nearind(2), numproc(2)
+        int4, dimension(:), pointer :: num_p
+        int4 :: nearind(2)
         real8,dimension(:,:),pointer :: weight,val
         real8 :: x(2),eta_min(2),eta_max(2),eta_star(2)
         int4 :: ii(2), Nc(2), flag, ind(2), ell_1, ell_2,row(4)
         int4 :: contrindex(4,2)  ! store the global indexes of the comtribution points
         int4 :: globalind(2),startind(2),nx1,nx2,gridind(2),startgridind(2)
         real8 :: fieldvalue, rho
-        int4 :: rank
+        int4 :: rank,dest,source,coords(2),coordsone(2),numproc(2),rankl, &
+                rankr,ranku,rankd,status
         int4 :: l,i,j,h,m
 
         allocate(weight(-1:2,-1:2), val(-1:2,-1:2))
 
         rank=pic2d%layout2d%collective%rank
         size=pic2d%para2d%numproc(1)*pic2d%para2d%numproc(2)
+        numproc=pic2d%para2d%numproc
         comm=pic2d%layout2d%collective%comm
+        Nc(1) = pic2d%para2d%m_x1%nodes
+        Nc(2) = pic2d%para2d%m_x2%nodes
         allocate(pointhead(0:size-1),curpoint(0:size-1))
         allocate(rcounts(0:size-1),scounts(0:size-1),sdispls(0:size-1),rdispls(0:size-1))  
         allocate(rcountsone(0:size-1),rcountstwo(0:size-1),scountstwo(0:size-1))
+        allocate(num_p(0:size-1))
+        num_p=0 
+        rcounts=0
+        scounts=0
+        sdispls=0
+        rdispls=0 
+        rcountsone=0
+        rcountstwo=0
+        scountstwo=0
         do i=0,size-1
           allocate(pointhead(i)%ptr)
         curpoint(i)%ptr=>pointhead(i)%ptr
@@ -655,8 +676,9 @@ contains
 
           end do
         end do
-        !print*, "rank=",rank, "sbuf=",sbuf 
-        call mpi_alltoallv(sbuf,scounts,sdispls,mpi_double_precision,rbuf,rcountsone,rdispls, &
+!print*, "rank=",rank,"h=",h
+
+       call mpi_alltoallv(sbuf,scounts,sdispls,mpi_double_precision,rbuf,rcountsone,rdispls, &
                         mpi_double_precision,comm,ierr)
 
         rho = sqrt(2.0d0*mu)
@@ -691,44 +713,84 @@ contains
         allocate(rbuf2nd(0:3*numout-1),stat=ierr)
 
         h=0
+        eta_min=(/pic2d%para2d%m_x1%eta_min,pic2d%para2d%m_x2%eta_min/)
+        eta_max=(/pic2d%para2d%m_x1%eta_max,pic2d%para2d%m_x2%eta_max/)
+     !   NC=(/pic2d%para2d%m_x1%nodes,pic2d%para2d%m_x1%nodes/)
         do i=0,size-1
           do j=1,rcounts(i)
             x=rbuf(5*h+1:5*h+2)
             call para_compute_spl2d_point_per_per_weight(weight,pic2d%para2d%m_x1,pic2d%para2d%m_x2,x,pic2d%para2d%row, &
                         pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n, &
                         pic2d%field2d%epwg_s, &
-                        pic2d%field2d%epwg_sw,  pic2d%field2d%epwg_se,pic2d%field2d%epwg_ne,pic2d%field2d%epwg_nw )    
-            call s_contribution_spl(x,val)
+                pic2d%field2d%epwg_sw,  pic2d%field2d%epwg_se,pic2d%field2d%epwg_ne,pic2d%field2d%epwg_nw )    
+            call s_localize_new(x,eta_min,eta_max,ii,eta_star,NC-(/1,1/),flag)
+            call s_contribution_spl(eta_star,val)
             fieldvalue=0._f64
             do m=-1,2
               do l=-1,2
                 fieldvalue=fieldvalue+val(m,l)*weight(m,l)
               end do
             end do
-            sbuf2nd(3*h)=fieldvalue
-            sbuf2nd(3*h+1:3*h+2)=rbuf(5*h+3:5*h+4)  ! which is the lobal grid number
+            sbuf2nd(3*h)=fieldvalue/real(pic2d%para2d%N_points,8)
+            sbuf2nd(3*h+1:3*h+2)=rbuf(5*h+3:5*h+4)  ! which is the local grid number
             h=h+1
-          end do
+         end do
         end do
-        !print*, "rank=",rank, "sbuf2nd=",sbuf2nd
         call mpi_alltoallv(sbuf2nd,scountstwo,sdispls,mpi_double_precision,rbuf2nd,rcountstwo, &
                         rdispls,mpi_double_precision,comm,ierr) 
         !print*, "rank=",rank,"rbuf2d=",rbuf2nd 
 
         numout=0
-        do i=1,size-1
+        do i=0,size-1
           numout=numout+num_p(i)
         end do
+        pic2d%field2d%epgyro=0.0
+        
         h=0
         do i=1,numout
+!          if(rank==7.and.rbuf2nd(3*h+2)==1.0) then
+!            print*, NINT(rbuf2nd(3*h+1)),NINT(rbuf2nd(3*h+2))
+!            print*, "rbuf2nd=", rbuf2nd(3*h)
+!          end if
           pic2d%field2d%epgyro(NINT(rbuf2nd(3*h+1)),NINT(rbuf2nd(3*h+2))) &
             =pic2d%field2d%epgyro(NINT(rbuf2nd(3*h+1)),NINT(rbuf2nd(3*h+2)))+rbuf2nd(3*h) 
           h=h+1
         end do
 
-        !  deallocate(rcounts,scounts,sdispls,rdispls,rcountsone,scountstwo,rcountstwo, &
+        coords=get_coords_from_processrank(rank,numproc)
+        coordsone(1)=coords(1)
+        coordsone(2)=modulo(coords(2)-1,numproc(2))
+        rankl=get_rank_from_processcoords(coordsone,numproc)
+        coordsone(2)=modulo(coords(2)+1,numproc(2))
+        rankr=get_rank_from_processcoords(coordsone,numproc)        
+        call mpi_sendrecv(pic2d%field2d%epgyro(1:Nc(1)-1,1),Nc(1)-1,mpi_double_precision,rankl,10,   & 
+             pic2d%field2d%epgyro(1:Nc(1)-1,Nc(2)),Nc(1)-1,mpi_double_precision,rankr,10,comm,status,ierr)
+       
+        coordsone(2)=coords(2) 
+        coordsone(1)=modulo(coords(1)-1,numproc(1))
+        rankd=get_rank_from_processcoords(coordsone,numproc)
+        coordsone(1)=modulo(coords(1)+1,numproc(1))
+        ranku=get_rank_from_processcoords(coordsone,numproc)
+        call mpi_sendrecv(pic2d%field2d%epgyro(1,1:Nc(2)-1),Nc(2)-1,mpi_double_precision,rankd,20,  &
+             pic2d%field2d%epgyro(Nc(1),1:Nc(2)-1),Nc(2)-1,mpi_double_precision,ranku,20,comm,status,ierr)
+
+        coordsone(1)=coords(1)-1
+        coordsone(2)=coords(2)-1
+        rankd=get_rank_from_processcoords(coordsone,numproc)
+        coordsone(1)=coords(1)+1
+        coordsone(2)=coords(2)+1
+        ranku=get_rank_from_processcoords(coordsone,numproc)        
+        call mpi_sendrecv(pic2d%field2d%epgyro(1,1),1,mpi_double_precision,rankd,30, &
+             pic2d%field2d%epgyro(Nc(1),Nc(2)),1,mpi_double_precision,ranku,30,comm,status,ierr)         
+       !  deallocate(rcounts,scounts,sdispls,rdispls,rcountsone,scountstwo,rcountstwo, &
                         !             sbuf2nd,rbuf2nd,sbuf,rbuf)
         !
+
+!call mpi_barrier(comm)
+!       if(rank==4) then
+!       print*, "rank=",rank, "sbuf2nd=",sbuf2nd 
+!       end if
+
      end subroutine  para_compute_gyroaverage_mesh_field
 
 
@@ -752,6 +814,7 @@ contains
            case("double_per")
 !             do j=1,mu_num
                allocate(num_p(0:size-1))
+               num_p=0
                allocate(pointhead(0:size-1)) 
                do i=0, size-1
                  allocate(pointhead(i)%ptr)
@@ -843,288 +906,6 @@ contains
    end subroutine precompute_doublegyroaverage_matrix
 
 
-     subroutine deri_forward_coef(p,d,coef)
-        int4,intent(in) :: p,d  ! p is the order of the accuracy and d denotes the dth order of the derivative
-        real8,dimension(p+d),intent(out) :: coef
-        int4 :: i,j,k,imax,imin
-        real8, dimension(:,:), allocatable :: buffer,buffer1,buffer2
-        real8, dimension(:), allocatable :: work
-        int4, dimension(:), allocatable :: ipiv
-        real8 :: info
-        imax=p+d-1
-        imin=0
-        allocate(buffer(imax+1,imax+1))
-        allocate(buffer1(imax+1,imax+1))
-        allocate(buffer2(imax+1,imax+1))
-        allocate(work(imax+1),ipiv(imax+1))
 
-        do i=1,imax+1
-        do j=1,imax+1
-          buffer(i,j)=real(j-1,8)**(i-1)
-        end do
-        end do
-
-        buffer1=buffer
-        buffer2=0.0
-
-        call DGETRF(imax+1,imax+1,buffer,imax+1,ipiv,info)
-
-        if(info.ne.0) then
-          stop "matrix is numerically singulari"
-        end if
-
-        call DGETRI(imax+1,buffer,imax+1,ipiv,work,imax+1,info)
-
-        if(info.ne.0) then
-          stop "matrix inversion failed"
-        end if
-
-        do i=1,imax+1
-          coef(i)=buffer(i,d+1)
-        end do
-        deallocate(buffer)
-        deallocate(buffer1)
-        deallocate(buffer2)
-
-    end subroutine deri_forward_coef
-
-    subroutine deri_central_coef(p,d,coef)
-        int4,intent(in) :: p,d  ! p is the order of the accuracy and d denotes the dth order of the derivative
-        real8,dimension(:),intent(inout) :: coef
-        int4 :: i,j,k,imax,imin
-        real8, dimension(:,:), allocatable :: buffer
-        real8, dimension(:), allocatable :: work
-        int4, dimension(:), allocatable :: ipiv
-        int4 :: info, im
-        imax=(p+d-1)/2
-        imin=-(p+d-1)/2
-        if(modulo(p+d,2)==0) then
-        im=p+d-1
-        else
-        im=p+d
-        end if
-        allocate(buffer(im,im))
-        allocate(work(im),ipiv(im))
-
-        do i=1,im
-          do j=1,im
-            buffer(i,j)=real(imin+j-1,8)**(i-1)
-          end do
-        end do
-        !  buffer1=buffer
-        call DGETRF(im,im,buffer,im,ipiv,info)
-
-        if(info.ne.0) then
-          stop "matrix is numerically singulari"
-        end if
-
-        call DGETRI(im,buffer,im,ipiv,work,im,info)
-
-        if(info.ne.0) then
-          stop "matrix inversion failed"
-        end if
-
-        do i=1,im
-          coef(i)=buffer(i,d+1)
-        end do
-
-    end subroutine deri_central_coef
-
-    subroutine muarray_euler_maclaurin_choice(mu_bound,mu_num,mus,muweight,scheme)
-        int4 :: pmax=8, d=6  ! d is the order of accuracy;pmax is the order of the derivative
-        real8,intent(in) :: mu_bound
-        int4,intent(in) :: mu_num,scheme
-        real8, dimension(:), intent(inout) :: mus,muweight
-        real8, dimension(:,:), allocatable :: coefmat
-        real8, dimension(:), allocatable :: coef,bernumvec
-
-        real8 :: binorm, bernum
-        real8 :: integ
-        real8 :: mul,mul1,mul2,mul3
-        int4 :: i,j,k,l
-        real8 :: B0
-        real8 :: dvperp,vperp
-        real8,dimension(:),allocatable ::trapeze(:),vptrapeze(:),g(:)
-
-        allocate(coefmat(pmax/2,pmax+d))
-        allocate(coef(pmax+d))
-        allocate(bernumvec(pmax+4))
-        allocate(trapeze(0:mu_num-1),vptrapeze(0:mu_num-1),g(0:mu_num-1))
-
-        select case (scheme)
-
-        case (1)   ! 1: forward finite difference
-        do i=1,pmax/2
-          coef=0.0
-          call deri_forward_coef(d,i*2-1,coef)
-          coefmat(i,:)=coef(:)
-        end do
-        case (2)  ! 2: central finite difference
-        do i=1,pmax/2
-          coef=0.0
-          call deri_central_coef(d,i*2-1,coef)
-          coefmat(i,:)=coef(:)
-        end do
-        case (3)  !3: michel's scheme
-        do i=1,pmax/2
-          coef=0.0
-          call deri_central_coef(d,2*i,coef)
-          coefmat(i,:)=coef(:)
-        end do
-        case default
-        print*, "input correct scheme, scheme1=", scheme
-        stop
-        end select
-
-!  print*, coefmat(2,:)
-
-        !!Bernu number
-
-        B0=1.0
-        do i=1,pmax+4
-          if(i==1)then
-            bernumvec(1)=-0.5
-          else
-        ! compute the binormal factor
-          mul1=1
-          do j=1,i+1
-            mul1=mul1*j
-          end do
-          bernum=0.0
-          do k=0,i-1
-            mul2=1
-            mul3=1
-            if(k==0) then
-              mul2=1
-            else
-              do j=1,k
-                mul2=mul2*j
-              end do
-            end if
-            do j=1,i+1-k
-              mul3=mul3*j
-            end do
-        ! compute the bernulli number
-            binorm=real(mul1,8)/(real(mul2,8)*real(mul3,8))
-            if(k==0) then
-              bernum=bernum+binorm*B0
-            else
-              bernum=bernum+binorm*bernumvec(k)
-            end if
-          end do
-          bernumvec(i)=-bernum/real(i+1,8)
-        end if
-        !           print*, "bernum",i,bernumvec(i)
-      end do
-
-      dvperp=sqrt(2.0*mu_bound)/real(mu_num-1,8)
-
-
-      select case (scheme)
-
-      case (1)
-        !!! forward difference
-        do i=0,mu_num-1
-          if(i==0) then
-            vptrapeze(i)=0.5
-            do j=1,pmax/2
-              vptrapeze(i)=vptrapeze(i)+bernumvec(2*j)*coefmat(j,1)/real(2*j,8)
-            end do
-          else if(i.ge.1.and.i.le.(pmax+d-2)) then
-            vptrapeze(i)=1.0
-            do j=1,pmax/2
-              if((2*j+d-2).ge.i) then
-                vptrapeze(i)=vptrapeze(i)+bernumvec(2*j)*coefmat(j,i+1)/real(2*j,8)
-              end if
-            end do
-          else if(i==mu_num-1) then
-            vptrapeze(mu_num-1)=1.0/2.0
-          else
-            vptrapeze(i)=1.0    !vptrapeze(i)+1.0
-          end if
-        end do
-
-      case (2)
-        !!!!central difference
-
-        do i=0,mu_num-1
-          if(i==0) then
-            vptrapeze(i)=0.5
-            do j=1,pmax/2
-              vptrapeze(i)=vptrapeze(i)+bernumvec(2*j)*coefmat(j,(2*j+d+1)/2+1)/real(2*j,8)
-!           print*, bernumvec(2*j), coefmat(j,(2*j+d+1)/2+1)
-            end do
-          else if(i.ge.1.and.i.le.(pmax+d-1)/2) then
-            vptrapeze(i)=1.0
-            do j=1,pmax/2
-              if((2*j+d-2)/2.ge.i) then
-                vptrapeze(i)=vptrapeze(i)+bernumvec(2*j)*(-coefmat(j,(2*j+d)/2-i)+ &
-                        coefmat(j,(2*j+d)/2+i))/real(2*j,8)
-              end if
-            end do
-          else if(i==mu_num-1) then
-            vptrapeze(mu_num-1)=1.0/2.0
-          else
-            vptrapeze(i)=1.0
-          end if
-        end do
-      case (3)
-        !!!!Michel's scheme: central difference
-        do i=0,mu_num-1
-          if(i==0) then
-            vptrapeze(i)=dvperp*bernumvec(2)/2.0
-            do j=1,pmax/2
-              vptrapeze(i)=vptrapeze(i)+dvperp*bernumvec(2*(j+1))*coefmat(j,(2*j+d-1)/2+1)/real(2*(j+1),8)
-            end do
-          else if(i.ge.1.and.i.le.(pmax+d-1)/2) then
-            vptrapeze(i)=real(i,8)*dvperp
-            do j=1,pmax/2
-              if((2*j+d-1)/2.ge.i) then
-                vptrapeze(i)=vptrapeze(i)+dvperp*bernumvec(2*j+2)*(coefmat(j,(2*j+d-1)/2+1-i)+ &
-                        coefmat(j,(2*j+d-1)/2+1+i))/real(2*j+2,8)
-              end if
-            end do
-          else if(i==mu_num-1) then
-            vptrapeze(mu_num-1)=1.0/2.0*real(i,8)*dvperp
-          else
-            vptrapeze(i)=real(i,8)*dvperp
-          end if
-        end do
-
-        case default
-        print*, "input the correct scheme,scheme2=", scheme
-        stop
-        end select
-!  print*,vptrapeze(:)
-
-       select case (scheme)
-
-         case (1)
-           do i=1,mu_num
-             vperp=real(i-1,8)*dvperp
-             muweight(i)=vptrapeze(i-1)*vperp*dvperp
-             mus(i)=vperp**2/2.0_f64
-           end do
-
-         case (2)
-           do i=1,mu_num
-             vperp=real(i-1,8)*dvperp
-             muweight(i)=vptrapeze(i-1)*vperp*dvperp
-             mus(i)=vperp**2/2.0_f64
-           end do
-
-         case (3)
-           do i=1,mu_num
-             vperp=real(i-1,8)*dvperp
-             muweight(i)=vptrapeze(i-1)*dvperp
-             mus(i)=vperp**2/2.0_f64
-           end do
-        
-         case default
-           print*, "input the correct scheme,scheme3=", scheme
-           stop
-         end select
-       end subroutine muarray_euler_maclaurin_choice
- 
 
 end module para_gyroaverage_2d_one

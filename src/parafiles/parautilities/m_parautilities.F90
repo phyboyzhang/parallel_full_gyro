@@ -1671,6 +1671,9 @@ subroutine gather_field_to_rootprocess_per_per(rootfield,boxfield,rank,size,boxi
 
      allocate(sbuf(0:num-1))
      allocate(scounts(0:size-1),sdispls(0:size-1))
+     scounts=0
+     sdispls=0
+     sbuf=0.0
      do i=0,size-1 
         scounts(i)=element_number_in_rank_per_per(i,numproc,layout2d)
         if(i==0) then
@@ -1681,7 +1684,8 @@ subroutine gather_field_to_rootprocess_per_per(rootfield,boxfield,rank,size,boxi
      end do
      myrank=layout2d%collective%rank
      rcounts=scounts(myrank)
-     allocate(rbuf(0:rcounts-1))   
+     allocate(rbuf(0:rcounts-1))  
+     rbuf=0.0 
      j=0
      do i=0,size-1
        length=dimsize_of_rank_per_per(i,numproc,layout2d)     
@@ -1695,6 +1699,7 @@ subroutine gather_field_to_rootprocess_per_per(rootfield,boxfield,rank,size,boxi
             j=j+1
         end do
      end do
+
      call mpi_scatterv(sbuf,scounts,sdispls,mpi_double_precision,rbuf,rcounts,mpi_double_precision,root,comm,ierr) 
      boxsize=dimsize_of_rank_per_per(myrank,numproc,layout2d)
      do j=1,  boxsize(2)  
@@ -1720,8 +1725,10 @@ subroutine gather_field_to_rootprocess_per_per(rootfield,boxfield,rank,size,boxi
         call mpi_recv(votex,1,mpi_double_precision,0,11,comm,status,ierr)
         boxfield(layout2d%boxes(rank)%i_max-layout2d%boxes(rank)%i_min+1,1)=votex
      end if
+!print*,"myrank=",myrank, boxfield
     call copy_boundary_value_per_per(boxfield,myrank,numproc,layout2d)
-         
+        
+    deallocate(scounts,sdispls,sbuf,rbuf) 
    end subroutine scatter_field_from_rootprocess_per_per 
  
 !!!!! This is used to accumulate the value on the interpolation point to the grid point

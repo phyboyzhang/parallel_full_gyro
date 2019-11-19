@@ -684,11 +684,11 @@ subroutine boris_single(x,v,dtful,magf,elef)
    return
  end subroutine gyrork_f_per_per_2nd
 
- subroutine sortposition_by_process_gyro2d(num,recnum,partlist,inlist,pic2d,dt,order)
+ subroutine sortposition_by_process_gyro2d(num,recnum,partlist,inlist,pic2d,dt,order,iter_num)
    class(pic_para_total2d_base),intent(in), pointer :: pic2d
    class(rk4gy2dnode), pointer,intent(in) :: partlist
    int4, dimension(:), pointer, intent(inout) :: recnum, num
-   int4, intent(in) :: order
+   int4, intent(in) :: order,iter_num
    real8, intent(in) :: dt 
    class(pointin_gy_node), pointer,intent(inout) :: inlist
    class(gyoutnode), dimension(:),pointer :: outtmp, outhead
@@ -740,7 +740,7 @@ subroutine boris_single(x,v,dtful,magf,elef)
                  outtmp(prank)%ptr%coords(1:2)=partmp%vec(1:2)
                  outtmp(prank)%ptr%coords(3)=partmp%coords(3)
                  outtmp(prank)%ptr%numpoint=h
-               allocate(outtmp(prank)%ptr%next)
+                 allocate(outtmp(prank)%ptr%next)
                  outtmp(prank)%ptr=>outtmp(prank)%ptr%next
 
                  partmp%at=1
@@ -752,9 +752,9 @@ subroutine boris_single(x,v,dtful,magf,elef)
            end if   
          end do
     
-    if(order.ne.1) then
+!    if(order.ne.1) then
       call mpi2d_alltoallv_send_points_orbit_gy2d(num,numgr,recnum,outhead,inlist,pic2d) 
-    end if
+!    end if
 
       case("nat_per")
         print*, "#ERROR: The current version doesn't include the nat_per boundary condition."
@@ -776,10 +776,10 @@ subroutine boris_single(x,v,dtful,magf,elef)
 
    end subroutine sortposition_by_process_gyro2d
 
-   subroutine compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,order,gyroorder)
+   subroutine compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,order,gyroorder,iter_num)
      class(pic_para_total2d_base), pointer,intent(in) :: pic2d
      class(rk4gy2dnode), pointer, intent(inout) :: partlist
-     int4, intent(in) :: order,gyroorder
+     int4, intent(in) :: order,gyroorder,iter_num
      class(rk4gy2dnode), pointer :: partmp
      real8 :: magf(3),elef(3),deri_bf(2),deri_driftsquare(2)
      character(25) :: geometry,boundary
@@ -820,7 +820,6 @@ subroutine boris_single(x,v,dtful,magf,elef)
                 else if(order==4) then
                  call gyrork_f_per_per(partmp%f4,partmp%coords(3),elef,deri_bf,magf)
                 end if         
-                partmp=>partmp%next
               case (2)
                 call compute_deri_of_sqgyep_per_per(deri_driftsquare,partmp%vec(1:2),pic2d)
                 if(order==1) then
@@ -832,15 +831,16 @@ subroutine boris_single(x,v,dtful,magf,elef)
                 else if(order==4) then
                  call gyrork_f_per_per_2nd(partmp%f4,partmp%coords(3),elef,deri_bf,magf,deri_driftsquare)
                 end if
-                partmp=>partmp%next
 
-              case default
+               case default
                 stop
             end select
 
           end if
        end if
-     end do
+       partmp=>partmp%next
+      end do
+
 
       case("nat_per")
         print*, "#ERROR: The current version doesn't include the nat_per boundary condition."
@@ -857,17 +857,17 @@ subroutine boris_single(x,v,dtful,magf,elef)
      stop
    end select 
 
-
    nullify(partmp)
+
  end subroutine compute_f_of_points_in_orbit_gyro2d
 
- subroutine compute_f_of_points_out_orbit_gyro2d(num,recnum,inlist,partlist,pic2d,order,gyroorder)
+ subroutine compute_f_of_points_out_orbit_gyro2d(num,recnum,inlist,partlist,pic2d,order,gyroorder,iter_num)
    int4, dimension(:), pointer, intent(in) :: num,recnum
 !   int4, intent(in) :: numnode
    class(pic_para_total2d_base), pointer,intent(in) :: pic2d
    class(rk4gy2dnode), pointer, intent(inout) :: partlist
    class(pointin_gy_node), pointer, intent(in) :: inlist
-   int4, intent(in) :: order,gyroorder
+   int4, intent(in) :: order,gyroorder,iter_num
    class(rk4gy2dnode), pointer :: partmp
    class(pointin_gy_node), pointer :: intmp
    real8 :: mag,elef(3),magf(3),deri_driftsquare(2),deri_bf(2)
@@ -889,6 +889,10 @@ subroutine boris_single(x,v,dtful,magf,elef)
       numnode=8    
    end if
    allocate(scounts(0:size-1),rcounts(0:size-1),sdispls(0:size-1),rdispls(0:size-1))
+   scounts=0
+   rcounts=0
+   sdispls=0
+   rdispls=0
    call prep_for_mpi_alltoallv_with_zeroinput(rank,size,numnode,recnum,num,scounts, &
            rcounts,sdispls,rdispls,numsend,numout)
 
@@ -1048,28 +1052,36 @@ subroutine boris_single(x,v,dtful,magf,elef)
        stop
     end select
 
+
      deallocate(sbuf2nd,rbuf2nd)
      deallocate(scounts,rcounts,sdispls,rdispls)
      nullify(partmp,intmp)
+!call mpi_barrier(comm)
+!    if(iter_num==761.and.order==4) then
+!      print*, rank
+!    end if
+
+
 
    end subroutine compute_f_of_points_out_orbit_gyro2d
 
-   subroutine gyrork4solve(gy2d_head,pic2d)
+   subroutine gyrork4solve(gy2d_head,pic2d,iter_num)
   ! It includes the magnetic field perturbation and the electric field perturbation
      class(pic_para_total2d_base), pointer :: pic2d
      class(gy2d_node), pointer, intent(inout) :: gy2d_head
      class(gy2d_node), pointer  :: tmp
      class(rk4gy2dnode), pointer :: partlist,partmp
      class(pointin_gy_node), pointer :: inlist, intmp
-
+     int4, intent(in) :: iter_num
      int4 :: prank,size,rank,numgr,gyroorder
      int4, dimension(:), pointer :: num,recnum
-     real8 :: dtgy
-     int4 :: i,j,h,order
+     real8 :: dtgy,coords(2)
+     int4 :: i,j,h,order,comm
 
      size=pic2d%layout2d%collective%size
      rank=pic2d%layout2d%collective%rank
      dtgy=pic2d%para2d%dtgy
+     comm=pic2d%layout2d%collective%comm
    
     gyroorder=pic2d%para2d%gyroorder
     size=pic2d%layout2d%collective%size
@@ -1093,37 +1105,27 @@ subroutine boris_single(x,v,dtful,magf,elef)
        end if
     end do
 
-  
     order=1
-    call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,order,gyroorder)
-!partmp=>partlist 
-!do while(associated(partmp))
-!   if(.not.associated(partmp%next)) then
-!      print*, "rank1=",rank
-!      exit
-!   else
-!      print*, "rank1=",rank,"coords=",partmp%coords(1:3)
-!      partmp=>partmp%next
-!   end if
-!end do
-
+    call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,order,gyroorder,iter_num)
 
     num=0
     recnum=0
     order=2
-    call sortposition_by_process_gyro2d(num,recnum,partlist,inlist,pic2d,dtgy,order)
-    call compute_f_of_points_out_orbit_gyro2d(num,recnum,inlist,partlist,pic2d,order,gyroorder)
-    call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,order,gyroorder)
- 
+    call sortposition_by_process_gyro2d(num,recnum,partlist,inlist,pic2d,dtgy,order,iter_num)
+    call compute_f_of_points_out_orbit_gyro2d(num,recnum,inlist,partlist,pic2d,order,gyroorder,iter_num)
+    call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,order,gyroorder,iter_num)
+
     deallocate(inlist)
     nullify(inlist)
     allocate(inlist)    
     num=0
     recnum=0
     order=3
-    call sortposition_by_process_gyro2d(num,recnum,partlist,inlist,pic2d,dtgy,order)
-    call compute_f_of_points_out_orbit_gyro2d(num,recnum,inlist,partlist,pic2d,order,gyroorder)
-    call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,order,gyroorder)
+    call sortposition_by_process_gyro2d(num,recnum,partlist,inlist,pic2d,dtgy,order,iter_num)
+    call compute_f_of_points_out_orbit_gyro2d(num,recnum,inlist,partlist,pic2d,order,gyroorder,iter_num)
+    call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,order,gyroorder,iter_num)
+
+
 
     deallocate(inlist)
     nullify(inlist)
@@ -1131,20 +1133,22 @@ subroutine boris_single(x,v,dtful,magf,elef)
     num=0
     recnum=0
     order=4
-    call sortposition_by_process_gyro2d(num,recnum,partlist,inlist,pic2d,dtgy,order)
-    call compute_f_of_points_out_orbit_gyro2d(num,recnum,inlist,partlist,pic2d,order,gyroorder)
-    call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,order,gyroorder)    
+    call sortposition_by_process_gyro2d(num,recnum,partlist,inlist,pic2d,dtgy,order,iter_num)
+    call compute_f_of_points_out_orbit_gyro2d(num,recnum,inlist,partlist,pic2d,order,gyroorder,iter_num)
+    call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,order,gyroorder,iter_num)    
 
-    tmp=>pic2d%gy2d_head
+
+    tmp=>gy2d_head
     partmp=>partlist
+
     do while(associated(tmp).and.associated(partmp))
-       if(.not.associated(tmp%next).or..not.associated(tmp%next)) then
-          exit
+       if(.not.associated(tmp%next).or..not.associated(partmp%next)) then
+         exit
        else
-          tmp%coords(1:2)=partmp%vec(:)+(dtgy/6.0_f64)*(partmp%f1(:)+2.0_f64*partmp%f2(:) &
-                             +2.0_f64*partmp%f3(:)+partmp%f4(:))
-       partmp=>partmp%next
-       tmp=>tmp%next
+          tmp%coords(1:2)=partmp%coords(1:2)+(dtgy/6.0_f64)*(partmp%f1(1:2)+2.0_f64*partmp%f2(1:2) &
+                          +2.0_f64*partmp%f3(1:2)+partmp%f4(1:2))
+          tmp=>tmp%next
+          partmp=>partmp%next
        end if
     end do
 
@@ -1265,12 +1269,13 @@ subroutine boris_single(x,v,dtful,magf,elef)
        else
          allocate(sbuf(0:numgr*numsend-1))
        end if
+       sbuf=0.0
        if(numout==0) then
          allocate(rbuf(0:0))
        else
          allocate(rbuf(0:numgr*numout-1))
        end if
-       
+       rbuf=0.0
        if(numsend==0) then
          goto 80
        else
@@ -1344,13 +1349,12 @@ subroutine mpi2d_alltoallv_send_points_orbit_gy2d(num,numgr,numrecv,outhead,poin
   sendtmp(i)%ptr=>outhead(i)%ptr
   end do
   allocate(rcounts(0:size-1),scounts(0:size-1),sdispls(0:size-1),rdispls(0:size-1), &
-           rbuf0(0:size-1),numrecv(0:size-1))
+           rbuf0(0:size-1))
   rcounts=0
   scounts=0
   sdispls=0
   rdispls=0
   rbuf0=0
-  numrecv=0
   call mpi_alltoall(num,1,mpi_integer,rbuf0,1,mpi_integer,comm,ierr)
 
   numrecv=rbuf0
@@ -1362,11 +1366,13 @@ subroutine mpi2d_alltoallv_send_points_orbit_gy2d(num,numgr,numrecv,outhead,poin
   else
     allocate(sbuf(0:numgr*numsend-1))
   end if
+  sbuf=0.0
   if(numout==0) then
     allocate(rbuf(0:0))
   else
     allocate(rbuf(0:numgr*numout-1))
   end if
+  rbuf=0.0
 
   if(numsend==0) then
     goto 110

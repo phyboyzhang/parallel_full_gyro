@@ -44,7 +44,7 @@ include "mpif.h"
     pic2d => initialize_pic_para_2d_base(size)
 !!! initialize parameter_2d_sets
     pic2d%para2d%gxmin=(/0.0,0.0/)
-    pic2d%para2d%gxmax=(/2.0,2.0/)
+    pic2d%para2d%gxmax=(/3.0,3.0/)
     pic2d%para2d%N_points=100
     pic2d%para2d%iter_number=20000
     pic2d%para2d%dtgy=0.5
@@ -63,10 +63,10 @@ include "mpif.h"
     pic2d%layout2d%collective%rank=rank
     pic2d%layout2d%collective%size=size
     pic2d%layout2d%collective%comm=mpi_comm_world
-    if(.not.f_is_power_of_two(int(size,8))) then
-      print*, "size is not a numer of power of 2"
-      stop
-    end if
+!    if(.not.f_is_power_of_two(int(size,8))) then
+!      print*, "size is not a numer of power of 2"
+!      stop
+!    end if
     pic2d%para2d%numproc=NINT(sqrt(real(size,8)))
     do i=1,2
        global_sz(i)=pic2d%para2d%cell_per_unit(i)*(pic2d%para2d%gxmax(i)-pic2d%para2d%gxmin(i))+1
@@ -156,17 +156,18 @@ call copy_boundary_value_per_per(pic2d%field2d%ep,rank,pic2d%para2d%numproc,pic2
     call gather_field_to_rootprocess_per_per(rootdata%field,pic2d%field2d%ep,rank,size,boxindex,&
           pic2d%para2d%numproc,pic2d%layout2d) 
 
-    if(rank==0) then
-       print*, 'rootfield=', rootdata%field
-    end if
+!    if(rank==0) then
+!       print*, 'rootfield=', rootdata%field
+!    end if
 
+    rootdata%field=1
     pic2d%field2d%ep=0._f64
     call scatter_field_from_rootprocess_per_per(rootdata%field,pic2d%field2d%ep,size, &
          pic2d%para2d%numproc,(/pic2d%layout2d%global_sz1,pic2d%layout2d%global_sz2/),pic2d%layout2d)
      
-    if(rank==0) then
-       print*, 'ep=', pic2d%field2d%ep
-    endif
+!    if(rank==0) then
+       print*, 'rank=',rank, pic2d%field2d%ep
+!    endif
  
     call MPI_FINALIZE(IERR) 
 end program test_paradata_utilities

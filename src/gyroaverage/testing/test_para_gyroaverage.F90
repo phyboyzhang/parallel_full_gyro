@@ -32,7 +32,8 @@ use m_para_spline, only: para_compute_spl2D_weight, &
                          para_spl2d_firstorder_derivatve_point_per_per
 
 use para_gyroaverage_2d_one,only: sort_quadraturepoint_among_process, &
-                                  para_compute_gyroaverage_stiff_matrix
+                                  para_compute_gyroaverage_stiff_matrix, &
+                                  store_data_on_rootprocess
 use gyroaverage_2d_base, only: gyropoint_node
 
 implicit none
@@ -262,21 +263,23 @@ end if
 
 !  num_p=0
 ! if(rank==2) then
-  call sort_quadraturepoint_among_process(pic2d%para2d%mu,rank,pointhead,num_p,pic2d%para2d%N_points, & 
-          pic2d)
+!  call sort_quadraturepoint_among_process(pic2d%para2d%mu,rank,pointhead,num_p,pic2d%para2d%N_points, & 
+!          pic2d)
 !  do i=0, size-1
 !     print*, "rank=",rank,"i=",i,"num_p(i)=",num_p(i)
 !  end do
 ! end if
 
-num_p=0
+!num_p=0
 !if(rank==0) then
-  call para_compute_gyroaverage_stiff_matrix(pointhead,num_p,pic2d%para2d%mu,1,pic2d%para2d%N_points,pic2d,rootdata)
+!  call para_compute_gyroaverage_stiff_matrix(pointhead,num_p,pic2d%para2d%mu,1,pic2d%para2d%N_points,pic2d,rootdata)
 !end if
 !if(rank==0) then
 !
 !print*, "acontri=",rootdata%acontri
 !end if
+
+  call store_data_on_rootprocess(pic2d%para2d%mu,1,rank,rootdata,pic2d)
 
 
     call MPI_FINALIZE(IERR) 

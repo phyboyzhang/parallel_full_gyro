@@ -163,50 +163,31 @@ contains
 
   end function compute_rank_from_globalind_2d
 
+
+  !!! compute the rank of the location x
   function compute_process_of_point_per_per(x,numproc,gxmin,gxmax,gboxmin,gboxmax) result(rank)
       real8, intent(inout) :: x(2)
       int4, intent(in) :: numproc(2)
       real8,dimension(:,:), pointer, intent(in) :: gboxmin,gboxmax
       real8,intent(in) ::  gxmin(2),gxmax(2)
-      int4 :: h,rankone   
+      int4 :: h,rankone  
       int4 :: rank
-      
-      call coordinates_pointoutbound_per_per(x,gxmin,gxmax) 
-      if(x(1)==gxmin(1).or.x(1)==gxmax(1)) then
-         rankone=0
-         if(x(2)==gxmin(2).or.x(2)==gxmax(2)) then
-            rank=0
-       !     num_p(0)=num_p(0)+1
-         else   
-            do h=0, numproc(2)-1
-              if(gboxmin(h*numproc(1),2).lt.x(2).and.gboxmax(h*numproc(1),2).ge.x(2)) then
-                  rank=h*numproc(1)
-       !           num_p(rank)=num_p(rank)+1
-                 goto 100
-               end if
-            end do
-100      end if
-      else
+
+     call coordinates_pointoutbound_per_per(x,gxmin,gxmax) 
+
             do h=0, numproc(1)-1
-              if(gboxmin(h,1).lt.x(1).and.gboxmax(h,1).ge.x(1)) then
+              if(gboxmin(h,1).le.x(1).and.gboxmax(h,1).gt.x(1)) then
                  rankone=h
-                 goto 200
-               end if
+                 exit
+              end if
             end do
-200         if(x(2)==gxmin(2).or.x(2)==gxmax(2)) then
-               rank=rankone
-       !        num_p(rankone)=num_p(rankone)+1
-            else
-              do h=0, numproc(2)-1
-                 if(gboxmin(h*numproc(1),2).lt.x(2).and.gboxmax(h*numproc(1),2).ge.x(2)) then
+
+           do h=0, numproc(2)-1
+                 if(gboxmin(h*numproc(1),2).le.x(2).and.gboxmax(h*numproc(2),2).gt.x(2)) then
                      rank=h*numproc(1)+rankone
-      !               num_p(rank)=num_p(rank)+1
-!                     print*, "h=",h,"rankone=",rankone
-                     goto 300
+                     exit
                  end if
-              end do
-300         end if
-        end if
+           end do
 
    end function compute_process_of_point_per_per
 
@@ -279,16 +260,24 @@ contains
       if(x(1).lt.gxmin(1)) then
          xbar=(gxmin(1)-x(1))-real(floor((gxmin(1)-x(1))/(gxmax(1)-gxmin(1))),8)*(gxmax(1)-gxmin(1))
          x(1)=gxmax(1)-xbar  !!!! Here, we use all the mesh in positive number
-      else if(x(1).gt.gxmax(1)) then
+      else if(x(1).ge.gxmax(1)) then
          xbar=x(1)-gxmax(1)-real(floor((x(1)-gxmax(1))/(gxmax(1)-gxmin(1))),8)*(gxmax(1)-gxmin(1))
          x(1)=gxmin(1)+xbar
       end if
       if(x(2).lt.gxmin(2)) then
          xbar=(gxmin(2)-x(2))-real(floor((gxmin(2)-x(2))/(gxmax(2)-gxmin(2))),8)*(gxmax(2)-gxmin(2))
          x(2)=gxmax(2)-xbar  !!!! Here, we use all the mesh in positive number
-      else if(x(2).gt.gxmax(2)) then
+      else if(x(2).ge.gxmax(2)) then
          xbar=x(2)-gxmax(2)-real(floor((x(2)-gxmax(2))/(gxmax(2)-gxmin(2))),8)*(gxmax(2)-gxmin(2))
          x(2)=gxmin(2)+xbar
+      end if
+
+      if(x(1)==gxmax(1)) then
+         x(1)=gxmin(1)
+      end if
+
+      if(x(2)==gxmax(2)) then
+         x(2)=gxmin(2)
       end if
 
    end subroutine coordinates_pointoutbound_per_per
@@ -299,7 +288,7 @@ contains
       if(x.lt.gboxmin) then
          xbar=(gboxmin-x)-real(floor((gboxmin-x)/(gboxmax-gboxmin)),8)*(gboxmax-gboxmin)
         coordinate_pointoutbound_per =gboxmax-xbar  !!!! Here, we use all the mesh in positive number
-      else if(x.gt.gboxmax) then
+      else if(x.ge.gboxmax) then
          xbar=x-gboxmax-real(floor((x-gboxmax)/(gboxmax-gboxmin)),8)*(gboxmax-gboxmin)
          coordinate_pointoutbound_per=gboxmin+xbar
       end if
@@ -307,9 +296,11 @@ contains
 
   function get_rank_from_processcoords(coords,numproc)
      int4 :: coords(2),numproc(2)
-     int4 :: get_rank_from_processcoords
+     int4 :: get_rank_from_processcoords,coordsone(2)
 
-     get_rank_from_processcoords=coords(2)*numproc(1)+coords(1)
+     coordsone(1)=modulo(coords(1),numproc(1))
+     coordsone(2)=modulo(coords(2),numproc(2))
+     get_rank_from_processcoords=coordsone(2)*numproc(1)+coordsone(1)
   end function
 
   function get_coords_from_processrank(rank,numproc) result(coords)
@@ -386,47 +377,47 @@ contains
       coords1(2)=numproc(2)-1
       dest=get_rank_from_processcoords(coords1,numproc)
   !  print*,"myrank=",myrank, 0
-      call mpi_send(sbuf,num,mpi_double_precision,dest,10,comm,ierr)
+      call mpi_send(sbuf,num,mpi_double_precision,dest,coords(1),comm,ierr)
       deallocate(sbuf)
 
     else if(coords(2)==numproc(2)-1) then
-      num=layout2d%boxes(myrank)%j_max-layout2d%boxes(myrank)%j_min+1 
+      num=layout2d%boxes(myrank)%i_max-layout2d%boxes(myrank)%i_min+1 
       allocate(rbuf(0:num-1)) 
       coords1(1)=coords(1)
       coords1(2)=0
       source=get_rank_from_processcoords(coords1,numproc)      
-      call mpi_recv(rbuf,num,mpi_double_precision,source,10,comm,status,ierr)
+      call mpi_recv(rbuf,num,mpi_double_precision,source,coords(1),comm,status,ierr)
       do i=1,layout2d%boxes(myrank)%i_max-layout2d%boxes(myrank)%i_min+1
          box(i,num)=rbuf(i-1)
       end do
       deallocate(rbuf)
     end if 
-
+!print*, 3
     if(coords(1)==0) then
       num=layout2d%boxes(myrank)%j_max-layout2d%boxes(myrank)%j_min+1
-      allocate(sbuf(0:num-1),rbuf(0:num-1))
+      allocate(sbuf(0:num-1))
       do j=1,num
          sbuf(j-1)=box(1,j)
       end do
       coords1(1)=numproc(1)-1
       coords1(2)=coords(2)
       dest=get_rank_from_processcoords(coords1,numproc)
-      call mpi_send(sbuf,num,mpi_double_precision,dest,20,comm,ierr)
+      call mpi_send(sbuf,num,mpi_double_precision,dest,coords(2),comm,ierr)
       deallocate(sbuf)
 
     else if(coords(1)==numproc(1)-1) then
-      num=layout2d%boxes(myrank)%i_max-layout2d%boxes(myrank)%i_min+1
+      num=layout2d%boxes(myrank)%j_max-layout2d%boxes(myrank)%j_min+1
       allocate(rbuf(0:num-1))
       coords1(1)=0
       coords1(2)=coords(2)
       source=get_rank_from_processcoords(coords1,numproc)
-      call mpi_recv(rbuf,num,mpi_double_precision,source,20,comm,status,ierr)
+      call mpi_recv(rbuf,num,mpi_double_precision,source,coords(2),comm,status,ierr)
       do i=1,layout2d%boxes(myrank)%j_max-layout2d%boxes(myrank)%j_min+1
          box(num,i)=rbuf(i-1)
       end do
       deallocate(rbuf)
     end if    
-
+!print*, 4
   end subroutine copy_boundary_value_per_per
 
 !!!! get the rank and local index of a interpolation point, which is used in

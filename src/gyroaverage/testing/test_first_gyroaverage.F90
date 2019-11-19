@@ -1,5 +1,6 @@
 Program test_first_gyroaverage
 #include "work_precision.h"
+use constants, only: pi_
 use cartesian_mesh,   only: cartesian_mesh_1d, &
                             init_para_cartesian_mesh_1d
 use paradata_type, only: pic_para_2d_base, &
@@ -54,12 +55,14 @@ include "mpif.h"
     int4 :: ierr
     real8, dimension(:,:), pointer :: weight
     real8 :: deri_firstorder(2)
+    int4 :: cell_per_unit(2)
 
 
 !!!!! gyroaverage
 
     real8 :: mu
     class(gyropoint_node), dimension(:),pointer :: pointhead
+    real8 :: rho
 
     allocate(weight(-1:2,-1:2))
 
@@ -77,32 +80,34 @@ include "mpif.h"
     pic2d=> initialize_pic_para_total2d_base(size)
 !!! initialize parameter_2d_sets
     pic2d%para2d%gxmin=(/0.0,0.0/)
-    pic2d%para2d%gxmax=(/3.0,3.0/)
-    pic2d%para2d%N_points=3
+    pic2d%para2d%gxmax=(/2.0*pi_,2.0*pi_/)
+    pic2d%para2d%N_points=4
     pic2d%para2d%iter_number=20000
     pic2d%para2d%dtgy=0.5
     pic2d%para2d%num_time=20
     pic2d%para2d%boundary="double_per"
     pic2d%para2d%geometry="cartesian"
-    pic2d%para2d%mu=0.2
+    pic2d%para2d%mu=0.01
     pic2d%para2d%row=3
-    pic2d%para2d%cell_per_unit=(/2,2/) 
+    pic2d%para2d%cell_per_unit=(/10,10/) 
     row=pic2d%para2d%row
 
-    do i=1,2
-       delta(i)=1._f64/real(pic2d%para2d%cell_per_unit(i),8)
-    end do
-
-    !!! initialize layout2d      
+     !!! initialize layout2d      
     pic2d%layout2d%collective%rank=rank
     pic2d%layout2d%collective%size=size
     pic2d%layout2d%collective%comm=mpi_comm_world
     pic2d%para2d%numproc=NINT(sqrt(real(size,8)))
     numproc=pic2d%para2d%numproc 
     comm=pic2d%layout2d%collective%comm
+    cell_per_unit=pic2d%para2d%cell_per_unit
+    rho=sqrt(2.0*pic2d%para2d%mu)
+
+   do i=1,2
+       delta(i)=pic2d%para2d%gxmax(i)/real(cell_per_unit(i)*numproc(i),8)
+    end do
  
     do i=1,2
-       global_sz(i)=pic2d%para2d%cell_per_unit(i)*(pic2d%para2d%gxmax(i)-pic2d%para2d%gxmin(i))+1
+       global_sz(i)=pic2d%para2d%cell_per_unit(i)*numproc(i)+1
     end do
 
     call initialize_layout_with_distributed_2d_array( &
@@ -144,7 +149,7 @@ include "mpif.h"
 if(rank==0) then
    print*, "gboxmin(:,1)",pic2d%para2d%gboxmin(:,1)
 
-   print*, "gboxmin(:,2)",pic2d%para2d%gboxmin(:,2)
+   print*, "gboxmax(:,1)",pic2d%para2d%gboxmax(:,1)
 end if
 
     pic2d%para2d%m_x1=>init_para_cartesian_mesh_1d(pic2d%layout2d%boxes(rank)%i_max-pic2d%layout2d%boxes(rank)%i_min+1,&
@@ -163,18 +168,23 @@ end if
   !!!periodic boundary condition
  
   dimsize=dimsize_of_rank_per_per(rank,pic2d%para2d%numproc,pic2d%layout2d)
-  do i=1,dimsize(1)
-    do j=1, dimsize(2)
+  
+  do i=1,dimsize(2)
+    do j=1, dimsize(1)  ! pic2d%para2d%m_x2%nodes
        globalind=globalind_from_localind_2d((/i,j/),pic2d%para2d%numproc,rank,pic2d%layout2d,pic2d%para2d%boundary)
-       pic2d%field2d%ep(i,j)=1.0    ! real(globalind(1)+globalind(2), 8)
+       pic2d%field2d%ep(i,j)=cos(real(globalind(2)-1,8)*delta(2))    ! real(globalind(1)+globalind(2), 8)
     end do
   end do
- 
-!     if(rank==2) then
-!        print*, "ep=", pic2d%field2d%ep
-!    end if
 
- call copy_boundary_value_per_per(pic2d%field2d%ep,rank,pic2d%para2d%numproc,pic2d%layout2d)
+  call copy_boundary_value_per_per(pic2d%field2d%ep,rank,pic2d%para2d%numproc,pic2d%layout2d)
+
+
+     if(rank==1) then
+        do i=1,2
+        print*, "ep=", pic2d%field2d%ep(i,:)*bessel_jn(0,rho)
+  !      print*, "ep=", pic2d%field2d%ep(3,:)
+        end do
+     end if
 
 !     if(rank==2) then
 !        print*, "ep=", pic2d%field2d%ep
@@ -216,22 +226,34 @@ end if
          pic2d%layout2d%global_sz2, &
          rootdata%ASPL)
 
+  end if
   call para_compute_spl2D_weight(rootdata%ASPL,rootdata%field,pic2d%field2d%ep_weight, &
        pic2d%para2d%numproc,pic2d%layout2d,pic2d%para2d%boundary)
-endif
 
 !   print*, "rank=",rank,pic2d%field2d%ep_weight
 
-    call scatter_field_from_rootprocess_per_per(rootdata%field,pic2d%field2d%ep_weight,size, &
-         pic2d%para2d%numproc,(/pic2d%layout2d%global_sz1,pic2d%layout2d%global_sz2/),pic2d%layout2d)
+!    call scatter_field_from_rootprocess_per_per(rootdata%field,pic2d%field2d%ep_weight,size, &
+!         pic2d%para2d%numproc,(/pic2d%layout2d%global_sz1,pic2d%layout2d%global_sz2/),pic2d%layout2d)
  
-
 !   call get_layout_2d_box_index(pic2d%layout2d,rank,boxindex)
     call mpi2d_alltoallv_box_per_per(row,comm,rank,numproc,pic2d%field2d%ep_weight,pic2d%field2d%epwg_w, &
        pic2d%field2d%epwg_e,pic2d%field2d%epwg_n,pic2d%field2d%epwg_s,pic2d%field2d%epwg_sw, &
        pic2d%field2d%epwg_se,pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne,boxindex)       
-
 call mpi_barrier(comm)
+
+
+! print*, "rank=",rank,"weight=", pic2d%field2d%ep_weight
+! print*, "epwg_w=", pic2d%field2d%epwg_w
+! print*, "epwg_e=", pic2d%field2d%epwg_e
+! print*, "epwg_n=", pic2d%field2d%epwg_n
+! print*, "epwg_s=",  pic2d%field2d%epwg_s
+! print*, "epwg_sw=", pic2d%field2d%epwg_sw
+! print*, "epwg_se=", pic2d%field2d%epwg_se
+! print*, "epwg_nw=", pic2d%field2d%epwg_nw
+! print*, "epwg_ne=", pic2d%field2d%epwg_ne
+
+
+!print*, pic2d%field2d%ep_weight
 
 ! if(rank==rankone) then
 !!     print*, "rankone=",rank
@@ -261,10 +283,14 @@ call mpi_barrier(comm)
 !
 ! call mpi_barrier(comm)
 
-num_p=0
- call para_compute_gyroaverage_mesh_field(num_p,pic2d%para2d%mu,1,pic2d)
+ num_p=0
+ call para_compute_gyroaverage_mesh_field(pic2d%para2d%mu,1,pic2d)
 
-
+if(rank==1) then
+   do i=1,2
+   print*, "epgyro=",pic2d%field2d%epgyro(i,:)
+   end do
+end if
 
 
 

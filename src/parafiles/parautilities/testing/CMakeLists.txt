@@ -15,3 +15,11 @@ TARGET_LINK_LIBRARIES(test_paradata_utilities
                       piclayout  
                       meshes  paradata_type paradata_layout                  
                       )
+
+ADD_EXECUTABLE(test_point_process test_point_process.F90)
+TARGET_LINK_LIBRARIES(test_point_process
+                      mpilayout utilities
+                      parautilities
+                      piclayout
+                      meshes  paradata_type paradata_layout
+                      )

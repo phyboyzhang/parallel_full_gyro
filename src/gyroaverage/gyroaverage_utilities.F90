@@ -7,7 +7,7 @@ public :: s_compute_shape_circle
 contains
   subroutine s_compute_shape_circle(points,N_points)
     int4,intent(in) :: N_points
-    real8,dimension(:,:) :: points
+    real8,dimension(:,:),pointer :: points
     int4 :: i
     real8 :: x
     do i=1,N_points

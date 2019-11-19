@@ -329,7 +329,7 @@ contains
 !    coords=get_coords_from_processrank(rank,numproc)   
     call s_localize_new(x,eta_min,eta_max,ii,eta_star,NC-(/1,1/),flag)
     call s_contribution_spl(eta_star, val)
-
+!print*, "ii=",ii,"eta_max=",eta_max,"eta_min=",eta_min
     do ell_1=-1,2
        ind(1)=ii(1)+ell_1
       !!! IN the sourthern part
@@ -340,10 +340,12 @@ contains
               ! in the southwestern box
                 if(ind(2).le.0) then
                    ind(2)=row+ind(2)-1
+!    print*, "1",ind
                    weight(ell_1,ell_2)=rsw(ind(1),ind(2))
                 ! in the sourthest box
                 else if(ind(2).gt.NC(2)) then
-                   ind(2)=ind(2)-NC(2)+1
+                  ind(2)=ind(2)-NC(2)+1
+!    print*, "3",ind 
                    weight(ell_1,ell_2)=rse(ind(1),ind(2))
                 ! in the sourthern box
                 else
@@ -586,28 +588,31 @@ end function para_compute_spl2d_field_point_per_per
      character(len=*), intent(in) :: boundary
      int4, intent(in) :: numproc(2)
      real8, dimension(:,:), pointer :: buf
+     real8, dimension(:), pointer :: buf1
      int4 :: global_sz(2), myrank
      int4 :: i,j,size,ierr
      global_sz(1)=layout2d%global_sz1
      global_sz(2)=layout2d%global_sz2
      size=layout2d%collective%size
-     allocate(buf(global_sz(1)*global_sz(2),1))
+     allocate(buf(global_sz(1)*global_sz(2),1),buf1(global_sz(1)*global_sz(2)))
  !    allocate(buf1(global_sz(1)*global_sz(2)))
      call MPI_COMM_RANK(layout2d%collective%comm,myrank,ierr) 
      if(myrank==0) then
        buf(:,1)=rootfield(:)
-       buf(:,1)=matmul(ASPL,buf(:,1))  
+       buf(:,1)=matmul(ASPL,buf(:,1)) 
+       buf1(:)=buf(:,1)
      end if 
      select case(boundary)
         case ("double_per")
-           call scatter_field_from_rootprocess_per_per(buf(:,1),boxweight,size,numproc,global_sz,layout2d)
+           call scatter_field_from_rootprocess_per_per(buf1,boxweight,size,numproc,global_sz,layout2d)
+!print*, boxweight
         case ("nat_per")
            stop
         case default
           stop
       end select
  
-      deallocate(buf) 
+      deallocate(buf,buf1) 
   end subroutine para_compute_spl2D_weight  
 
 
