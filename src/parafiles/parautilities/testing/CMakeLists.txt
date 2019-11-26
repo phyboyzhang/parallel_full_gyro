@@ -21,5 +21,5 @@ TARGET_LINK_LIBRARIES(test_point_process
                       mpilayout utilities
                       parautilities
                       piclayout
-                      meshes  paradata_type paradata_layout
+                      meshes  paradata_type paradata_layout interpolation
                       )
