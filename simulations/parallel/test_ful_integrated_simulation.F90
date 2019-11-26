@@ -6,7 +6,9 @@ use paradata_type, only: pic_para_2d_base, &
                          pic_para_total2d_base
 use paradata_layout, only:    initialize_pic_para_2d_base, &
                               initialize_pic_para_total2d_base, &
-                              allocate_memory_to_field_2d
+                              allocate_memory_to_field_2d_ful, &
+                              allocate_memory_to_field_2d_gy, &
+                              allocate_memory_to_magfield_2d
                               
 use utilities_module, only: f_is_power_of_two
 use m_mpilayout, only : initialize_layout_with_distributed_2d_array, &
@@ -204,8 +206,9 @@ end if
     num1=pic2d%layout2d%boxes(rank)%i_max-pic2d%layout2d%boxes(rank)%i_min+1
     num2=pic2d%layout2d%boxes(rank)%j_max-pic2d%layout2d%boxes(rank)%j_min+1                    
 
-
-    call allocate_memory_to_field_2d(pic2d%field2d,num1,num2,row)
+call allocate_memory_to_field_2d_ful(pic2d%field2d,num1,num2,row)
+call allocate_memory_to_field_2d_gy(pic2d%field2d,num1,num2,row,1)
+call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
    rootdata=>initialize_rootdata_structure(pic2d%layout2d%global_sz1*pic2d%layout2d%global_sz2)
 
     boxindex(1)=pic2d%layout2d%boxes(rank)%i_min
@@ -227,13 +230,13 @@ num_p=0
    fileitem1=10
    filepath1="/PARA/blsc950/electrostatic_exp/run/density.txt"
 !  call para_accept_reject_gaussian1d_ful2d_per_per(pic2d)
-  call para_accprej_gaus1d2v_fulgyro_unifield_per_per(curful,pic2d)  
+!  call para_accprej_gaus1d2v_fulgyro_unifield_per_per(curful,pic2d)  
 !  call sort_particle_among_box_ful2d_per_per(pic2d,num_p)
-  call partition_density_to_grid_ful(pic2d) 
+  call partition_density_to_grid_ful(curful,pic2d) 
 !
    call open_file(fileitem1,filepath1,rank)  
    
-   call para_write_field_file_2d(pic2d%field2d%den,fileitem1,rootdata,pic2d)
+   call para_write_field_file_2d(pic2d%field2d%denf,fileitem1,rootdata,pic2d)
 
    call close_file(fileitem1,rank)
 

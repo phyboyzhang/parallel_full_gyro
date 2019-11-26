@@ -7,7 +7,9 @@ use paradata_type, only: pic_para_2d_base, &
                          pic_para_total2d_base
 use paradata_layout,only:     initialize_pic_para_2d_base, &
                               initialize_pic_para_total2d_base, &
-                              allocate_memory_to_field_2d
+                              allocate_memory_to_field_2d_ful, &
+                              allocate_memory_to_field_2d_gy, &
+                              allocate_memory_to_magfield_2d
                               
 use utilities_module, only: f_is_power_of_two
 use m_mpilayout, only : initialize_layout_with_distributed_2d_array, &
@@ -15,7 +17,7 @@ use m_mpilayout, only : initialize_layout_with_distributed_2d_array, &
 use piclayout, only :   root_precompute_data, &
                         initialize_rootdata_structure, &
                         ful2d_node, &
-                        ful2dsend_node,gy2d_node,gy2dsend_node
+                        ful2dsend_node,gy2d_node,gy2dsend_node, gy2dmu_node
 use m_parautilities, only: mpi2d_alltoallv_box_per_per, &
                            gather_field_to_rootprocess_per_per, &
                            scatter_field_from_rootprocess_per_per
@@ -62,7 +64,7 @@ use m_moveparticles, only: new_position_per_per_ful, &
 use para_write_file, only: open_file,&
                            close_file, &
                            para_write_field_file_2d
-use m_para_orbit, only: borissolve, fulrk4solve, gyrork4solve, &
+use m_para_orbit, only: borissolve, fulrk4solve, &
                         para_obtain_interpolation_elefield_per_per_ful, &
                         sortposition_by_process_ful2d, &
                         compute_f_of_points_out_orbit_ful2d, &
@@ -119,6 +121,7 @@ include "mpif.h"
    class(rk4ful2dnode), pointer :: partlist,partmp
    class(pointin_node), pointer :: inlist, intmp
    class(ful2d_node), pointer :: ful2dtmp,ful2d_head
+   class(gy2dmu_node), dimension(:),  pointer :: gy2dmu_head,gy2dmutmp
    real8 :: f1(6), f2(6),f3(6),f4(6)
    real8 :: elef(3), magf(3)
    real8 :: rho,theta,x2(2)
@@ -126,7 +129,6 @@ include "mpif.h"
    int4, dimension(:), pointer :: num,recnum
    real8 :: vec(6),dt
    int4 :: h,numgr,numleft,numcircle,order,rk4order
-
 
     allocate(weight(-1:2,-1:2))
 
@@ -138,6 +140,11 @@ include "mpif.h"
     allocate(partlist,inlist)
     allocate(ful2d_head) 
     allocate(gy2d_head)  
+
+    allocate(gy2dmu_head(1),gy2dmutmp(1))
+    allocate(gy2dmu_head(1)%ptr)
+
+!    allocate(numleft_gy(mu_num))
 
     do i=0, size-1
       allocate(pointhead(i)%ptr)
@@ -238,7 +245,9 @@ end if
     num2=pic2d%layout2d%boxes(rank)%j_max-pic2d%layout2d%boxes(rank)%j_min+1                    
 
 
-    call allocate_memory_to_field_2d(pic2d%field2d,num1,num2,row)
+call allocate_memory_to_field_2d_ful(pic2d%field2d,num1,num2,row)
+call allocate_memory_to_field_2d_gy(pic2d%field2d,num1,num2,row,1)
+call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
    rootdata=>initialize_rootdata_structure(pic2d%layout2d%global_sz1*pic2d%layout2d%global_sz2)
 
     boxindex(1)=pic2d%layout2d%boxes(rank)%i_min
@@ -293,7 +302,7 @@ end if
    numcircle=pic2d%para2d%numcircle
 
    ful2dtmp=>ful2d_head
-   gy2dtmp=>gy2d_head
+   gy2dmutmp(1)%ptr=>gy2dmu_head(1)%ptr
     allocate(currk(0:size-1))
     allocate(gy2dsendtmp(0:size-1),gy2dsend_head(0:size-1))
     do i=0,size-1
@@ -305,6 +314,7 @@ end if
 !     goto 10 
 !   else
 
+   gy2dmutmp(1)%ptr=>gy2dmu_head(1)%ptr
    num_gy=0
 
    do j=1,pic2d%para2d%m_x1%nodes-1
@@ -336,11 +346,11 @@ end if
               allocate(ful2dtmp%next)
               ful2dtmp=>ful2dtmp%next
 
-              gy2dtmp%coords(1:2)=coords(1:2)
-              gy2dtmp%coords(3)=pic2d%para2d%mu 
+              gy2dmutmp(1)%ptr%coords(1:2)=coords(1:2)
+              gy2dmutmp(1)%ptr%coords(3)=pic2d%para2d%mu 
               num_gy(rank1)=num_gy(rank1)+1
-              allocate(gy2dtmp%next)
-              gy2dtmp=>gy2dtmp%next
+              allocate(gy2dmutmp(1)%ptr%next)
+              gy2dmutmp(1)%ptr=>gy2dmutmp(1)%ptr%next
             else
               currk(rank1)%ptr%coords(1)=coords(1)
               currk(rank1)%ptr%coords(2)=coords(2)
@@ -373,7 +383,7 @@ call mpi_barrier(comm)
    gy2dtmp=>gy2d_head
    call mpi2d_alltoallv_send_particle_2d(ful2dtmp,currk,num_p,pic2d)
 
-   call mpi2d_alltoallv_send_particle_2d_gy(gy2dtmp,gy2dsendtmp,num_gy,pic2d)
+   call mpi2d_alltoallv_send_particle_2d_gy(gy2dmu_head,gy2dsend_head,num_gy,1,pic2d)
 
 
 

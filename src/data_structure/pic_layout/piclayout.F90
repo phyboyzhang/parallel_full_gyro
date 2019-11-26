@@ -7,13 +7,14 @@ module piclayout
   implicit none
 
 
-  public ::   ful2drank_node, &
-              gy2drank_node,  &
-              parameters_set_2d, &
+  public ::   parameters_set_2d, &
+              ful2drank_node, &
               ful2d_node,  &
+              ful2dsend_node, & 
               gy2d_node, &
-              ful2dsend_node, &
               gy2dsend_node, &
+              gy2drank_node,  & 
+              gy2dmu_node,   &
               root_precompute_data,&
               pic_field_2d_base, &
               pic_field_2d, &
@@ -41,7 +42,7 @@ module piclayout
      real8 :: mumin,mumax
      int4 :: mu_scheme
      real8 :: tempt
-     real8, dimension(:),pointer :: temp_i,temp_e
+     real8, dimension(:,:),pointer :: temp_i,temp_e
 
      int4  :: row   !!! left,right,up,down, the number of lines for the communication for interpolation
      real8 :: gxmin(2),gxmax(2) 
@@ -66,30 +67,55 @@ module piclayout
 
 
   type :: pic_field_2d
-    real8, dimension(:,:),  pointer :: Bf01,Bf02,Bf03 !! the magnetic field on the mesh
-    real8, dimension(:,:),  pointer :: Bf01wg,Bf02wg,Bf03wg  !! the first index is for the three spatial dimensions
-    real8, dimension(:,:),    pointer :: ep  !! the electrostatic potential on the mesh before the gyroaverage    
+    real8, dimension(:,:),    pointer :: Bf01,Bf02,Bf03 !! the magnetic field on the mesh
+    real8, dimension(:,:),    pointer :: Bf01wg,Bf02wg,Bf03wg  !! the first index is for the three spatial dimensions
+    real8, dimension(:,:),    pointer :: ep  !!  ep is the potential for the
+                                             !!  full-particle simulation 
     real8, dimension(:,:),    pointer :: ep_weight
-    real8, dimension(:,:),    pointer :: den,den_weight
-    real8, dimension(:,:),    pointer :: denequ,denequ_weight
- !   real8, dimension(:,:),    pointer :: dens_weight  
-    real8, dimension(:,:),    pointer :: epgyro
-    real8, dimension(:,:),    pointer :: epgy_weight    
-    real8, dimension(:,:),    pointer :: epgysqwg
+    real8, dimension(:,:),    pointer :: denf  !!! denf: the full density
+    real8, dimension(:,:),    pointer :: denfeq 
+    real8, dimension(:,:,:),  pointer :: deng,deng_weight  !!! deng : the gyro density
+    real8, dimension(:,:,:),  pointer :: dengeq,dengeq_weight   !!! The first index is for the magnetic moment
+    real8, dimension(:,:),    pointer :: dengtot,dengeqtot       !!! The total density
+
+!   real8, dimension(:,:),    pointer :: dens_weight  
+    real8, dimension(:,:),    pointer :: gep,gep_weight   !! gep is the ful potential for 
+                                                          !! the gyrokinetic simulation 
+    real8, dimension(:,:,:),    pointer :: epgyro
+    real8, dimension(:,:,:),    pointer :: epgy_weight    
+    real8, dimension(:,:),    pointer :: epgysq_weight
   end type  pic_field_2d
   
   type,extends(pic_field_2d) :: pic_field_2d_base
-    real8, dimension(:,:),  pointer :: bf03_W,bf03_E, bf03_N,bf03_S,bf03_SW,bf03_SE,bf03_NE,bf03_NW
-    real8, dimension(:,:),  pointer :: bf03wg_W,bf03wg_E, bf03wg_N,bf03wg_S,bf03wg_SW,bf03wg_SE,bf03wg_NE,bf03wg_NW    
+    real8, dimension(:,:),    pointer :: bf03_W,bf03_E, bf03_N,bf03_S,bf03_SW,bf03_SE,bf03_NE,bf03_NW
+    real8, dimension(:,:),    pointer :: bf03wg_W,bf03wg_E, bf03wg_N,bf03wg_S,bf03wg_SW,bf03wg_SE,bf03wg_NE,bf03wg_NW    
+
     real8, dimension(:,:),    pointer :: ep_W,ep_E,ep_N,ep_S,ep_SW,ep_SE,ep_NE,ep_NW
     real8, dimension(:,:),    pointer :: epwg_W,epwg_E,epwg_N,epwg_S,epwg_SW,epwg_SE,epwg_NE,epwg_NW   
-    real8, dimension(:,:),    pointer :: den_W,den_E,den_N, den_S, den_SW, den_SE, &
-                                         den_NE,den_NW
-    real8, dimension(:,:),    pointer :: denequ_W,denequ_E,denequ_N, denequ_S, denequ_SW, denequ_SE, &
-                                         denequ_NE,denequ_NW
-!!!! The gyroaverage part
-    real8, dimension(:,:),    pointer :: epgy_W,epgy_E,epgy_N,epgy_S,epgy_SW,epgy_SE,epgy_NE,epgy_NW
-    real8, dimension(:,:),    pointer :: epgywg_W,epgywg_E,epgywg_N,epgywg_S,epgywg_SW,epgywg_SE, &
+
+    real8, dimension(:,:),    pointer :: gep_W,gep_E,gep_N,gep_S,gep_SW,gep_SE,gep_NE,gep_NW
+    real8, dimension(:,:),    pointer :: gepwg_W,gepwg_E,gepwg_N,gepwg_S,gepwg_SW,gepwg_SE,gepwg_NE,gepwg_NW
+
+    real8, dimension(:,:),    pointer :: denf_W,denf_E,denf_N, denf_S, denf_SW, denf_SE, &
+                                         denf_NE,denf_NW
+    real8, dimension(:,:),    pointer :: denfeq_W,denfeq_E,denfeq_N, denfeq_S, denfeq_SW, denfeq_SE, &
+                                         denfeq_NE,denfeq_NW
+
+    real8, dimension(:,:,:),  pointer :: dengeq_W,dengeq_E,dengeq_N, dengeq_S, dengeq_SW, dengeq_SE, &
+                                         dengeq_NE,dengeq_NW   
+    real8, dimension(:,:,:),  pointer :: deng_W,deng_E,deng_N, deng_S, deng_SW, deng_SE, &
+                                         deng_NE,deng_NW
+    real8, dimension(:,:,:),  pointer :: dengeqwg_W,dengeqwg_E,dengeqwg_N, dengeqwg_S, dengeqwg_SW, dengeqwg_SE, &
+                                         dengeqwg_NE,dengeqwg_NW
+    real8, dimension(:,:,:),  pointer :: dengwg_W,dengwg_E,dengwg_N,dengwg_S,dengwg_SW, &
+                                         dengwg_SE,dengwg_NE,dengwg_NW    
+    real8, dimension(:,:),    pointer :: dengtot_W,dengtot_E,dengtot_N,dengtot_S,dengtot_SW,dengtot_SE, &
+                                         dengtot_NE,dengtot_NW
+    real8, dimension(:,:),    pointer :: dengeqtot_W,dengeqtot_E,dengeqtot_N,dengeqtot_S,dengeqtot_SW, &
+                                         dengeqtot_SE,dengeqtot_NE,dengeqtot_NW
+       
+    real8, dimension(:,:,:),  pointer :: epgy_W,epgy_E,epgy_N,epgy_S,epgy_SW,epgy_SE,epgy_NE,epgy_NW
+    real8, dimension(:,:,:),  pointer :: epgywg_W,epgywg_E,epgywg_N,epgywg_S,epgywg_SW,epgywg_SE, &
                                          epgywg_NE,epgywg_NW   
     real8, dimension(:,:),    pointer :: epgysqwg_W,epgysqwg_E,epgysqwg_N,epgysqwg_S,epgysqwg_SW,epgysqwg_SE,  &
                                          epgysqwg_NE,epgysqwg_NW
@@ -98,7 +124,7 @@ module piclayout
 
   type :: root_precompute_data
     real8, dimension(:,:),    pointer :: ACONTRI,ASPL
-    real8, dimension(:),    pointer :: field
+    real8, dimension(:),      pointer :: field
     real8, dimension(:,:),    pointer :: prematrix
   end type
 
@@ -154,6 +180,10 @@ module piclayout
   type gy2dsend_node
      type(gy2drank_node),pointer :: ptr
   end type
+
+  type gy2dmu_node
+     type(gy2d_node), pointer :: ptr
+  end type  
   
 !  type,extends(pic_para_2d_base) :: pic_para_gy2d_base  
 !     type(gy2d_node),         pointer  :: gy2d_head

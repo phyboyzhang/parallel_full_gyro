@@ -10,9 +10,11 @@ implicit none
 
 public::  initialize_pic_para_2d_base, &
           initialize_pic_para_total2d_base, &
-          allocate_memory_to_field_2d, &
+          initialize_pic_para_total2d_base_2nd, &
+          allocate_memory_to_field_2d_ful, &
+          allocate_memory_to_field_2d_gy,  &
+          allocate_memory_to_magfield_2d,  &
           initialize_parameters_2d
-
 contains
 
   function initialize_pic_para_2d_base(size)   result(pic2d)
@@ -45,20 +47,26 @@ contains
 
     allocate(pic2d%para2d)
     allocate(pic2d%para2d%gboxmin(0:size-1,2),pic2d%para2d%gboxmax(0:size-1,2))
-    allocate(pic2d%para2d%temp_i(pic2d%layout2d%global_sz1))
-    allocate(pic2d%para2d%temp_e(pic2d%layout2d%global_sz2))
-    allocate(pic2d%para2d%mu_nodes(pic2d%para2d%mu_num))
-    allocate(pic2d%para2d%mu_weights(pic2d%para2d%mu_num))
 
     do i=1,size
       allocate(pic2d%ful2dsend_head(i-1)%ptr)
       allocate(pic2d%gy2dsend_head(i-1)%ptr)
     end do
 
-  end function
+  end function initialize_pic_para_total2d_base
+
+  subroutine initialize_pic_para_total2d_base_2nd(pic2d)
+     class(pic_para_total2d_base), pointer, intent(inout) :: pic2d
+
+     allocate(pic2d%para2d%temp_i(pic2d%layout2d%global_sz1,pic2d%layout2d%global_sz2))
+     allocate(pic2d%para2d%temp_e(pic2d%layout2d%global_sz1,pic2d%layout2d%global_sz2))
+     allocate(pic2d%para2d%mu_nodes(pic2d%para2d%mu_num))
+     allocate(pic2d%para2d%mu_weights(pic2d%para2d%mu_num))
+
+  end subroutine initialize_pic_para_total2d_base_2nd
 
 
-  subroutine allocate_memory_to_field_2d(field2d,num1,num2,row)
+  subroutine allocate_memory_to_field_2d_ful(field2d,num1,num2,row)
     type(pic_field_2d_base), pointer,intent(inout) :: field2d
     int4,intent(in) :: num1,num2,row
     int4 :: ierr
@@ -67,15 +75,113 @@ contains
       allocate(field2d,stat=ierr)
    end if
 
-   allocate(field2d%ep(num1,num2),field2d%ep_w(num1,row),&
-  field2d%ep_e(num1,row),field2d%ep_n(row,num2),field2d%ep_s(row,num2),&
+   allocate(field2d%ep(num1,num2),field2d%ep_w(num1,row), &
+  field2d%ep_e(num1,row),field2d%ep_n(row,num2),field2d%ep_s(row,num2), &
   field2d%ep_sw(row,row),field2d%ep_se(row,row),field2d%ep_nw(row,row),field2d%ep_ne(row,row),stat=ierr)
 
-
-     allocate(field2d%ep_weight(num1,num2),field2d%epwg_w(num1,row),&
+   allocate(field2d%ep_weight(num1,num2),field2d%epwg_w(num1,row),&
   field2d%epwg_e(num1,row),field2d%epwg_n(row,num2),field2d%epwg_s(row,num2),&
   field2d%epwg_sw(row,row),field2d%epwg_se(row,row),field2d%epwg_nw(row,row),&
   field2d%epwg_ne(row,row), stat=ierr)
+
+     allocate(field2d%denf(num1,num2),field2d%denf_w(num1,row),&
+  field2d%denf_e(num1,row),field2d%denf_n(row,num2),field2d%denf_s(row,num2), &
+  field2d%denf_sw(row,row),field2d%denf_se(row,row),field2d%denf_nw(row,row), &
+  field2d%denf_ne(row,row), stat=ierr)
+
+     allocate(field2d%denfeq(num1,num2),field2d%denfeq_w(num1,row), &
+  field2d%denfeq_e(num1,row),field2d%denfeq_n(row,num2),field2d%denfeq_s(row,num2), &
+  field2d%denfeq_sw(row,row),field2d%denfeq_se(row,row),field2d%denfeq_nw(row,row), &
+  field2d%denfeq_ne(row,row), stat=ierr)
+
+
+  end subroutine allocate_memory_to_field_2d_ful
+
+
+  subroutine allocate_memory_to_field_2d_gy(field2d,num1,num2,row,mu_num)
+    type(pic_field_2d_base), pointer,intent(inout) :: field2d
+    int4,intent(in) :: num1,num2,row,mu_num
+    int4 :: ierr
+
+   if(.not.associated(field2d)) then
+      allocate(field2d,stat=ierr)
+   end if
+
+
+   allocate(field2d%gep(num1,num2),field2d%gep_w(num1,row), &
+  field2d%gep_e(num1,row),field2d%gep_n(row,num2),field2d%gep_s(row,num2), &
+  field2d%gep_sw(row,row),field2d%gep_se(row,row),field2d%gep_nw(row,row), &
+  field2d%ep_ne(row,row),stat=ierr)
+
+   allocate(field2d%gep_weight(num1,num2),field2d%gepwg_w(num1,row), &
+  field2d%gepwg_e(num1,row),field2d%gepwg_n(row,num2),field2d%gepwg_s(row,num2),&
+  field2d%gepwg_sw(row,row),field2d%gepwg_se(row,row),field2d%gepwg_nw(row,row),&
+  field2d%gepwg_ne(row,row), stat=ierr)
+
+   allocate(field2d%epgyro(mu_num,num1,num2),field2d%epgy_w(mu_num,num1,row), &
+  field2d%epgy_e(mu_num,num1,row),field2d%epgy_n(mu_num,row,num2),field2d%epgy_s(mu_num,row,num2), &
+  field2d%epgy_sw(mu_num,row,row),field2d%epgy_se(mu_num,row,row),field2d%epgy_nw(mu_num,row,row), &
+  field2d%epgy_ne(mu_num,row,row),stat=ierr)
+
+   allocate(field2d%epgy_weight(mu_num,num1,num2),field2d%epgywg_w(mu_num,num1,row), &
+  field2d%epgywg_e(mu_num,num1,row),field2d%epgywg_n(mu_num,row,num2),field2d%epgywg_s(mu_num,row,num2), &
+  field2d%epgywg_sw(mu_num,row,row),field2d%epgywg_se(mu_num,row,row),field2d%epgywg_nw(mu_num,row,row), &
+  field2d%epgywg_ne(mu_num,row,row),stat=ierr)
+
+     allocate(field2d%deng(mu_num,num1,num2),field2d%deng_w(mu_num,num1,row),&
+  field2d%deng_e(mu_num,num1,row),field2d%deng_n(mu_num,row,num2),field2d%deng_s(mu_num,row,num2), &
+  field2d%deng_sw(mu_num,row,row),field2d%deng_se(mu_num,row,row),field2d%deng_nw(mu_num,row,row), &
+  field2d%deng_ne(mu_num,row,row), stat=ierr)
+
+     allocate(field2d%dengeq(mu_num,num1,num2),field2d%dengeq_w(mu_num,num1,row), &
+  field2d%dengeq_e(mu_num,num1,row),field2d%dengeq_n(mu_num,row,num2),field2d%dengeq_s(mu_num,row,num2), &
+  field2d%dengeq_sw(mu_num,row,row),field2d%dengeq_se(mu_num,row,row),field2d%dengeq_nw(mu_num,row,row), &
+  field2d%dengeq_ne(mu_num,row,row), stat=ierr)
+
+     allocate(field2d%dengeq_weight(mu_num,num1,num2),field2d%dengeqwg_w(mu_num,num1,row), &
+  field2d%dengeqwg_e(mu_num,num1,row),field2d%dengeqwg_n(mu_num,row,num2),field2d%dengeqwg_s(mu_num,row,num2), &
+  field2d%dengeqwg_sw(mu_num,row,row),field2d%dengeqwg_se(mu_num,row,row),field2d%dengeqwg_nw(mu_num,row,row), &
+  field2d%dengeqwg_ne(mu_num,row,row), stat=ierr)
+
+     allocate(field2d%deng_weight(mu_num,num1,num2),field2d%dengwg_w(mu_num,num1,row), &
+  field2d%dengwg_e(mu_num,num1,row),field2d%dengwg_n(mu_num,row,num2),field2d%dengwg_s(mu_num,row,num2), &
+  field2d%dengwg_sw(mu_num,row,row),field2d%dengwg_se(mu_num,row,row),field2d%dengwg_nw(mu_num,row,row), &
+  field2d%dengwg_ne(mu_num,row,row), stat=ierr)
+
+
+
+     allocate(field2d%dengtot(num1,num2), stat=ierr)
+     allocate(field2d%dengeqtot(num1,num2), stat=ierr)
+
+
+
+     allocate(field2d%epgyro(mu_num,num1,num2),field2d%epgy_w(mu_num,num1,row), &
+  field2d%epgy_e(mu_num,num1,row),field2d%epgy_n(mu_num,row,num2),field2d%epgy_s(mu_num,row,num2), &
+  field2d%epgy_sw(mu_num,row,row),field2d%epgy_se(mu_num,row,row),field2d%epgy_nw(mu_num,row,row), &
+  field2d%epgy_ne(mu_num,row,row), stat=ierr)
+
+     allocate(field2d%epgy_weight(mu_num,num1,num2),field2d%epgywg_w(mu_num,num1,row), &
+  field2d%epgywg_e(mu_num,num1,row),field2d%epgywg_n(mu_num,row,num2),field2d%epgywg_s(mu_num,row,num2), &
+  field2d%epgywg_sw(mu_num,row,row),field2d%epgywg_se(mu_num,row,row),field2d%epgywg_nw(mu_num,row,row), &
+  field2d%epgywg_ne(mu_num,row,row), stat=ierr)
+
+     allocate(field2d%epgysq_weight(num1,num2),field2d%epgysqwg_w(num1,row), &
+  field2d%epgysqwg_e(num1,row),field2d%epgysqwg_n(row,num2),field2d%epgysqwg_s(row,num2), &
+  field2d%epgysqwg_sw(row,row),field2d%epgysqwg_se(row,row),field2d%epgysqwg_nw(row,row), &
+  field2d%epgysqwg_ne(row,row), stat=ierr)
+
+
+
+  end subroutine allocate_memory_to_field_2d_gy
+
+  subroutine allocate_memory_to_magfield_2d(field2d,num1,num2,row)
+    type(pic_field_2d_base), pointer,intent(inout) :: field2d
+    int4,intent(in) :: num1,num2,row
+    int4 :: ierr
+
+   if(.not.associated(field2d)) then
+      allocate(field2d,stat=ierr)
+   end if
 
    allocate(field2d%Bf03(num1,num2),field2d%Bf03_w(num1,row),&
   field2d%Bf03_e(num1,row),field2d%Bf03_n(row,num2),field2d%Bf03_s(row,num2),&
@@ -85,28 +191,7 @@ contains
   field2d%Bf03wg_e(num1,row),field2d%Bf03wg_n(row,num2),field2d%Bf03wg_s(row,num2),&
   field2d%Bf03wg_sw(row,row),field2d%Bf03wg_se(row,row),field2d%Bf03wg_nw(row,row),field2d%Bf03wg_ne(row,row),stat=ierr)
 
-     allocate(field2d%den(num1,num2),field2d%den_w(num1,row),&
-  field2d%den_e(num1,row),field2d%den_n(row,num2),field2d%den_s(row,num2), &
-  field2d%den_sw(row,row),field2d%den_se(row,row),field2d%den_nw(row,row), &
-  field2d%den_ne(row,row), stat=ierr)
-
-     allocate(field2d%denequ(num1,num2),field2d%denequ_w(num1,row), &
-  field2d%denequ_e(num1,row),field2d%denequ_n(row,num2),field2d%denequ_s(row,num2), &
-  field2d%denequ_sw(row,row),field2d%denequ_se(row,row),field2d%denequ_nw(row,row), &
-  field2d%denequ_ne(row,row), stat=ierr)
-
-     allocate(field2d%epgyro(num1,num2),field2d%epgy_w(num1,row), &
-  field2d%epgy_e(num1,row),field2d%epgy_n(row,num2),field2d%epgy_s(row,num2), &
-  field2d%epgy_sw(row,row),field2d%epgy_se(row,row),field2d%epgy_nw(row,row), &
-  field2d%epgy_ne(row,row), stat=ierr)
-
-     allocate(field2d%epgy_weight(num1,num2),field2d%epgywg_w(num1,row), &
-  field2d%epgywg_e(num1,row),field2d%epgywg_n(row,num2),field2d%epgywg_s(row,num2), &
-  field2d%epgywg_sw(row,row),field2d%epgywg_se(row,row),field2d%epgywg_nw(row,row), &
-  field2d%epgywg_ne(row,row), stat=ierr)
-
   end subroutine
-
 
    subroutine initialize_parameters_2d(pic2d)
       class(pic_para_total2d_base), pointer, intent(inout) :: pic2d

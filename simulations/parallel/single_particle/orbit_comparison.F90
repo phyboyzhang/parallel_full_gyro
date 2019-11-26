@@ -5,9 +5,11 @@ use cartesian_mesh,   only: cartesian_mesh_1d, &
                             init_para_cartesian_mesh_1d
 use paradata_type, only: pic_para_2d_base, &
                               pic_para_total2d_base
-use paradata_layout, only:    initialize_pic_para_2d_base, &
-                              initialize_pic_para_total2d_base, &
-                              allocate_memory_to_field_2d
+use paradata_layout, only:    initialize_pic_para_total2d_base, &
+                              initialize_pic_para_total2d_base_2nd, &
+                              allocate_memory_to_field_2d_ful, &
+                              allocate_memory_to_field_2d_gy,  &
+                              allocate_memory_to_magfield_2d
                               
 use utilities_module, only: f_is_power_of_two
 use m_mpilayout, only : initialize_layout_with_distributed_2d_array, &
@@ -52,7 +54,8 @@ use para_random_sample, only: para_accept_reject_gaussian1d_ful2d_per_per, &
                               para_accprej_gaus1d2v_fulgyro_unifield_per_per
 
 use m_moveparticles, only: push_particle_among_box_ful2d_per_per
-use m_fieldsolver, only: solve_weight_of_field_among_processes
+use m_fieldsolver, only: solve_weight_of_field_among_processes, &
+                         solve_gyfieldweight_from_fulfield
 use m_precompute,  only: precompute_ASPL
 use m_moveparticles, only: new_position_per_per_ful, &
                            push_particle_among_box_ful2d_per_per, &
@@ -61,19 +64,20 @@ use para_write_file, only: open_file,&
                            close_file, &
                            para_write_field_file_2d, &
                            para_write_orbit_file_2d, &
-                           para_write_orbit_file_2d_gy
-use m_para_orbit, only: borissolve, fulrk4solve, gyrork4solve, &
-                        para_obtain_interpolation_elefield_per_per_ful, &
+                           para_write_orbit_file_2d_gy, &
+                           para_write_orbit_file_2d_gy_allmu
+use m_para_orbit, only: para_obtain_interpolation_elefield_per_per_ful, &
                         sortposition_by_process_ful2d, &
                         compute_f_of_points_out_orbit_ful2d, &
                         fulrkfunc_f_per_per, &
                         compute_f_of_points_in_orbit_ful2d
 use orbit_data_base, only: rk4ful2dnode, pointin_node,tp_ful2d_node, &
                            tp_ful2dsend_node, &
-                           rk4gy2dnode, tp_gy2d_node,tp_gy2dsend_node
+                           rk4gy2dnode, tp_gy2d_node,tp_gy2dsend_node, &
+                           tp_gy2dallmu_node
 use field_initialize,only: para_initialize_field_2d_mesh
 use m_tp_para_orbit, only: tp_push_ful_orbit, &
-                           tp_push_gy_orbit, &
+                           tp_push_gy_orbit_allmu, &
                            tp_ful_solve, &
                            tp_ful2dlist_to_ful2dlist, &
                            tp_sort_particles_among_ranks
@@ -88,7 +92,7 @@ include "mpif.h"
     int4  :: num1,num2,row
     real8 :: amp,wave_one,wave_two,amp_eq
     character(90) :: geometry="cartesian"
-    int4  :: i,j,size1,k
+    int4  :: i,j,size1,k,h
     int4  :: rankone,startind(2),globalind(2)
     int4, dimension(:),pointer :: num_p
     real8 :: x(2),v(2),x1(2), fieldvalue
@@ -129,43 +133,31 @@ include "mpif.h"
 !   int4 :: row,prank,size,numgr,rank
    int4, dimension(:), pointer :: num,recnum
    real8 :: vec(6),dt
-   int4 :: order,h,num_time
+   int4 :: order,num_time
 
 !!! Test test_particles
    class(tp_ful2d_node), pointer :: tpful2d_head,tpful2dtmp,tprk4ful2d_head,tprk4ful2dtmp
-   class(tp_gy2d_node),  pointer :: tpgy2d_head,tpgy2dtmp
+   class(tp_gy2dallmu_node),dimension(:), pointer :: tpgy2dmu_head,tpgy2dmutmp
    class(tp_ful2dsend_node), dimension(:), pointer :: tpful2dsend_head,tpful2dsendtmp, &
                              tprk4ful2dsend_head, tprk4ful2dsendtmp
    class(tp_gy2dsend_node), dimension(:), pointer :: tpgy2dsend_head,tpgy2dsendtmp
-   int4 :: numleft_rk4,numleft_boris,numleft_gy,numcircle,numgr,numgr_gy
+   int4 :: numleft_rk4,numleft_boris,numcircle,numgr,numgr_gy
+   int4, dimension(:), pointer :: numleft_gy
    character(25) :: pushkind
-   int4, dimension(:), pointer :: num_rk4,num_gy
+   int4, dimension(:), pointer :: num_rk4
+   int4, dimension(:), pointer :: num_gy 
    real8 :: rho, theta,x2(2)
    int4 :: rk4order,cell_per_unit(2)
-   int4 :: orbit_field=1
+   int4 :: mu_num
+   int4 :: orbit_field=0
+   character(250),dimension(:),pointer :: mugyfileitems
+   character(100) :: muth  
 
     allocate(weight(-1:2,-1:2))
 
     call MPI_INIT(IERR)
     call MPI_COMM_SIZE(MPI_COMM_WORLD,size,ierr)
     call MPI_COMM_RANK(MPI_COMM_WORLD,rank,ierr)
-    allocate(num_p(0:size-1),recnum(0:size-1))
-    allocate(pointhead(0:size-1))
-    allocate(partlist,inlist) 
-
-    allocate(tpful2d_head,tprk4ful2d_head,tpgy2d_head)
-    allocate(tpful2dsend_head(0:size-1),tpful2dsendtmp(0:size-1))
-    allocate(tprk4ful2dsend_head(0:size-1), tprk4ful2dsendtmp(0:size-1))
-    allocate(tpgy2dsend_head(0:size-1), tpgy2dsendtmp(0:size-1))
-    allocate(num_rk4(0:size-1),num_gy(0:size-1))
-    allocate(ful2d_head, gy2d_head)
-  
-
-    do i=0, size-1
-      allocate(pointhead(i)%ptr)
-    end do
-
-    num_p=0
 
     pic2d=> initialize_pic_para_total2d_base(size)
 !!! initialize parameter_2d_sets
@@ -178,9 +170,10 @@ include "mpif.h"
     pic2d%para2d%num_time=15
     pic2d%para2d%boundary="double_per"
     pic2d%para2d%geometry="cartesian"
-    pic2d%para2d%mu=0.3
+    pic2d%para2d%mu=1.0
+    pic2d%para2d%mu_num=1
     pic2d%para2d%row=3
-    pic2d%para2d%cell_per_unit=(/30,30/) 
+    pic2d%para2d%cell_per_unit=(/10,10/) 
     pic2d%para2d%dtful=pic2d%para2d%dtgy/real(pic2d%para2d%num_time,8)
     !!! particle in cell part
     pic2d%para2d%sigma = 1.0
@@ -189,10 +182,10 @@ include "mpif.h"
     pic2d%para2d%mumax=20._F64
     pic2d%para2d%gyroorder=1
     row=pic2d%para2d%row
-    amp=0.01
-    amp_eq=0.01
-    wave_one=8.0
-    wave_two=8.0
+    amp=0.02
+    amp_eq=0.0
+    wave_one=20.0
+    wave_two=20.0
     num_time=pic2d%para2d%num_time
     cell_per_unit=pic2d%para2d%cell_per_unit
 
@@ -204,7 +197,29 @@ include "mpif.h"
     pic2d%para2d%numproc=NINT(sqrt(real(size,8)))
     numproc=pic2d%para2d%numproc 
     comm=pic2d%layout2d%collective%comm
+    mu_num=pic2d%para2d%mu_num
 
+    allocate(num_p(0:size-1),recnum(0:size-1))
+    allocate(partlist,inlist) 
+
+    allocate(tpful2d_head,tprk4ful2d_head)
+    allocate(tpful2dsend_head(0:size-1),tpful2dsendtmp(0:size-1))
+    allocate(tprk4ful2dsend_head(0:size-1), tprk4ful2dsendtmp(0:size-1))
+    allocate(tpgy2dsend_head(0:size-1), tpgy2dsendtmp(0:size-1))
+    allocate(num_rk4(0:size-1),num_gy(0:size-1))
+    allocate(ful2d_head)
+
+    allocate(tpgy2dmu_head(1),tpgy2dmutmp(1))
+    allocate(tpgy2dmu_head(1)%ptr) 
+    allocate(numleft_gy(mu_num))
+    allocate(mugyfileitems(mu_num))
+
+    allocate(pointhead(0:size-1)) 
+    do i=0, size-1
+      allocate(pointhead(i)%ptr)
+    end do
+
+    num_p=0
     do i=1,2
        delta(i)=pic2d%para2d%gxmax(i)/real(cell_per_unit(i)*numproc(i),8)
     end do
@@ -226,6 +241,7 @@ include "mpif.h"
          print*, "size,boxes(i),",i,pic2d%layout2d%boxes(i)
        enddo  
     end if
+    call initialize_pic_para_total2d_base_2nd(pic2d)
 
     global_sz(1)=pic2d%layout2d%global_sz1
     global_sz(2)=pic2d%layout2d%global_sz2 
@@ -266,9 +282,11 @@ end if
     num1=pic2d%layout2d%boxes(rank)%i_max-pic2d%layout2d%boxes(rank)%i_min+1
     num2=pic2d%layout2d%boxes(rank)%j_max-pic2d%layout2d%boxes(rank)%j_min+1                    
 
+call allocate_memory_to_field_2d_ful(pic2d%field2d,num1,num2,row)
+call allocate_memory_to_field_2d_gy(pic2d%field2d,num1,num2,row,mu_num)
+call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
 
-    call allocate_memory_to_field_2d(pic2d%field2d,num1,num2,row)
-    rootdata=>initialize_rootdata_structure(pic2d%layout2d%global_sz1*pic2d%layout2d%global_sz2)
+   rootdata=>initialize_rootdata_structure(pic2d%layout2d%global_sz1*pic2d%layout2d%global_sz2)
 
     boxindex(1)=pic2d%layout2d%boxes(rank)%i_min
     boxindex(2)=pic2d%layout2d%boxes(rank)%i_max
@@ -283,7 +301,8 @@ end if
   do i=1,dimsize(1)
     do j=1, dimsize(2)
        globalind=globalind_from_localind_2d((/i,j/),pic2d%para2d%numproc,rank,pic2d%layout2d,pic2d%para2d%boundary)
-       pic2d%field2d%ep(i,j)=real(globalind(2),8)*0.1    ! real(globalind(1)+globalind(2), 8)
+       pic2d%field2d%gep(i,j)=real(globalind(2),8)*0.1    ! real(globalind(1)+globalind(2), 8)
+       pic2d%field2d%ep(i,j)=real(globalind(2),8)*0.1    ! real(globalind(1)+globalind(2), 8) 
        pic2d%field2d%Bf03(i,j)=1.0
     end do
   end do
@@ -303,13 +322,16 @@ end if
        pic2d%field2d%ep_weight, pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n, &
        pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
        pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
+ 
+  call solve_weight_of_field_among_processes(pic2d%field2d%gep,rootdata%ASPL,rootdata,pic2d, &
+       pic2d%field2d%gep_weight, pic2d%field2d%gepwg_w,pic2d%field2d%gepwg_e,pic2d%field2d%gepwg_n, &
+       pic2d%field2d%gepwg_s, pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se, &
+       pic2d%field2d%gepwg_nw,pic2d%field2d%gepwg_ne)
   
   call para_compute_gyroaverage_mesh_field(pic2d%para2d%mu,1,pic2d)
-print*, rank
-  call solve_weight_of_field_among_processes(pic2d%field2d%epgyro,rootdata%ASPL,rootdata,pic2d, &
-       pic2d%field2d%epgy_weight, pic2d%field2d%epgywg_w,pic2d%field2d%epgywg_e,pic2d%field2d%epgywg_n, &
-       pic2d%field2d%epgywg_s, pic2d%field2d%epgywg_sw,pic2d%field2d%epgywg_se, &
-       pic2d%field2d%epgywg_nw,pic2d%field2d%epgywg_ne)
+!print*, rank
+  
+  call solve_gyfieldweight_from_fulfield(rootdata,pic2d)
 
   call solve_weight_of_field_among_processes(pic2d%field2d%Bf03,rootdata%ASPL,rootdata,pic2d, &
        pic2d%field2d%bf03wg, pic2d%field2d%BF03wg_w,pic2d%field2d%bf03wg_e,pic2d%field2d%bf03wg_n, &
@@ -332,8 +354,11 @@ print*, rank
 
    numcircle=pic2d%para2d%numcircle 
    tpful2dtmp=>tpful2d_head
-   tpgy2dtmp=>tpgy2d_head
    tprk4ful2dtmp=>tprk4ful2d_head
+!   do i=1,mu_num
+      tpgy2dmutmp(1)%ptr=>tpgy2dmu_head(1)%ptr
+!   end do   
+
    numgr=5
    numgr_gy=4
    num_p=0
@@ -349,12 +374,12 @@ print*, rank
          pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)   
 !   print*, rank1,"x1=",x1
        if(rank1==rank) then
-         tpgy2dtmp%coords(1:2)=x1(1:2)
-         tpgy2dtmp%coords(3)  =pic2d%para2d%mu
-         tpgy2dtmp%tp=1
+         tpgy2dmutmp(1)%ptr%coords(1:2)=x1(1:2)
+         tpgy2dmutmp(1)%ptr%coords(3)  =pic2d%para2d%mu
+         tpgy2dmutmp(1)%ptr%tp=1
          num_gy(rank1)=num_gy(rank1)+1
-         allocate(tpgy2dtmp%next)
-         tpgy2dtmp=>tpgy2dtmp%next
+         allocate(tpgy2dmutmp(1)%ptr%next)
+         tpgy2dmutmp(1)%ptr=>tpgy2dmutmp(1)%ptr%next
        else
          tpgy2dsendtmp(rank1)%ptr%coords(1:2)=x1(1:2)
          tpgy2dsendtmp(rank1)%ptr%coords(3)  =pic2d%para2d%mu
@@ -363,8 +388,6 @@ print*, rank
          allocate(tpgy2dsendtmp(rank1)%ptr%next)
          tpgy2dsendtmp(rank1)%ptr=>tpgy2dsendtmp(rank1)%ptr%next
        endif
-   
-
 
    do j=0,numcircle-1
        theta=real(j,8)*2.0_f64*pi_/real(numcircle,8)
@@ -407,9 +430,10 @@ print*, rank
      end do       
    end if
     call tp_mpi2d_alltoallv_send_particle_2d(tpful2d_head,numleft_boris,tpful2dsend_head,num_p,numgr,pic2d)
-    call tp_mpi2d_alltoallv_send_particle_2d(tprk4ful2d_head,numleft_rk4,tprk4ful2dsend_head,num_rk4,numgr,pic2d)
-    call tp_mpi2d_alltoallv_send_particle_2d_gy(tpgy2d_head,numleft_gy,tpgy2dsend_head, &
-                                                num_gy,numgr_gy,pic2d)
+   call tp_mpi2d_alltoallv_send_particle_2d(tprk4ful2d_head,numleft_rk4,tprk4ful2dsend_head,num_rk4,numgr,pic2d)
+       call tp_mpi2d_alltoallv_send_particle_2d_gy(tpgy2dmu_head,numleft_gy(1),tpgy2dsend_head, &
+                                                num_gy,numgr_gy,1,pic2d)
+
 
 !tpgy2dtmp=>tpgy2d_head
 !do while(associated(tpgy2dtmp)) 
@@ -448,19 +472,19 @@ print*, rank
     if(rank==0) then 
       print*, "#pushkind=", pushkind
     end if
-   fileitem_boris=10
-   fileitem_rk4  =20
-   fileitem_gy   =30
+   fileitem_boris=100
+   fileitem_rk4  =200
    filepath1="/home/qmlu/zsx163/parallel_full_gyro/run/orbit/orbit_"
 
    filepath_boris=trim(filepath1)//"boris"//".txt"
    filepath_rk4  =trim(filepath1)//"rk4"//".txt"
-   filepath_gy   =trim(filepath1)//"gy"//".txt"
-
      call open_file(fileitem_boris,filepath_boris,rank)
      call open_file(fileitem_rk4,  filepath_rk4,  rank)
-     call open_file(fileitem_gy,   filepath_gy,   rank)
-     
+     i=1
+       write(unit=muth,fmt=*) i
+       filepath_gy=trim(filepath1)//"gy_"//trim(adjustl(muth))//".txt"        
+       call open_file(i,   filepath_gy,   rank)
+    
      
 !tpful2dtmp=>tpful2d_head
 !do while(associated(tpful2dtmp)) 
@@ -472,31 +496,50 @@ print*, rank
 !   end if
 !end do
 !print*, "rank2=",rank,num_p
+
+
 rk4order=4
 
-     do i=1, 1000
-if(rank==0) then
-print*, "#i=",i
-end if
+     do i=1, 5
+        if(rank==0) then
+           print*, "#i=",i
+        end if
+ 
         do j=1,pic2d%para2d%num_time 
            call tp_push_ful_orbit(tpful2d_head,numleft_boris,numgr,pic2d,"boris",rk4order,(i-1)*num_time+j)
-           call tp_push_ful_orbit(tprk4ful2d_head,numleft_rk4,numgr,pic2d,"rk4", rk4order,(i-1)*num_time+j)
-           call para_write_orbit_file_2d(tpful2d_head,numleft_boris,numgr,fileitem_boris,pic2d,(i-1)*num_time+j) 
-           call para_write_orbit_file_2d(tprk4ful2d_head,numleft_rk4,numgr,fileitem_rk4,pic2d, (i-1)*num_time+j)
-        end do
-        call tp_push_gy_orbit(tpgy2d_head,numleft_gy,numgr_gy,pic2d,rk4order,i) 
-        call para_write_orbit_file_2d_gy(tpgy2d_head,numleft_gy,numgr_gy,fileitem_gy,pic2d,i)
 
-    end do
+          call tp_push_ful_orbit(tprk4ful2d_head,numleft_rk4,numgr,pic2d,"rk4", rk4order,(i-1)*num_time+j)
+
+           call para_write_orbit_file_2d(tpful2d_head,numleft_boris,numgr,fileitem_boris,pic2d,(i-1)*num_time+j) 
+          call para_write_orbit_file_2d(tprk4ful2d_head,numleft_rk4,numgr,fileitem_rk4,pic2d, (i-1)*num_time+j)
+        end do
+
+        call tp_push_gy_orbit_allmu(tpgy2dmu_head,numleft_gy,numgr_gy,pic2d,rk4order,i) 
+
+        call para_write_orbit_file_2d_gy(tpgy2dmu_head,numleft_gy(1),numgr_gy,1,1,pic2d,i)
+   end do
 
      call close_file(fileitem_boris,rank)
      call close_file(fileitem_rk4,rank)
-     call close_file(fileitem_gy,rank)
+!     do i=1,mu_num
+       call close_file(1,rank)
+!     end do
+
+!      tpgy2dmutmp(1)%ptr=>tpgy2dmu_head(1)%ptr
+!      do while(associated(tpgy2dmutmp(1)%ptr))
+!        if(.not.associated(tpgy2dmutmp(1)%ptr%next)) then
+!           exit
+!        else
+!           print*, "i=",i,"rank=",rank, tpgy2dmutmp(1)%ptr%coords(1:2)
+!          tpgy2dmutmp(1)%ptr=>tpgy2dmutmp(1)%ptr%next
+!        end if
+!      end do
 
 
 
-   !  print*, rank
+
 100  continue
+       call mpi_barrier(comm)
      call MPI_FINALIZE(IERR) 
   end program  orbit_comparison
 

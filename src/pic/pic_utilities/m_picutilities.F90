@@ -1,14 +1,16 @@
 module m_picutilities
 #include "work_precision.h"
 use utilities_module, only: gp_error
-use piclayout, only:& 
+use piclayout, only: & 
      parameters_set_2d, &
      ful2d_node, &
      ful2drank_node, &
-     gy2drank_node, &
      ful2dsend_node, &
-     gy2d_node,gy2dsend_node
-    
+     gy2d_node, &
+     gy2dsend_node, &
+     gy2drank_node, &
+     gy2dmu_node
+  
 use paradata_type, only: pic_para_total2d_base
 use m_mpilayout, only: t_layout_2d, &
                  get_layout_2d_box_index
@@ -17,8 +19,8 @@ use paradata_utilities, only: compute_process_of_point_per_per, &
                               prep_for_mpi_alltoallv_with_zeroinput
 use m_parautilities, only: combine_boundfield_between_neighbor_alltoall
 use orbit_data_base, only: tp_ful2d_node,tp_ful2dsend_node, &
+                           tp_gy2dallmu_node, &
                            tp_gy2d_node,tp_gy2dsend_node
-use piclayout, only: ful2d_node,ful2dsend_node 
 
 implicit none
 include "mpif.h"
@@ -35,21 +37,21 @@ include "mpif.h"
                 tp_sort_particles_among_ranks, &
                 tp_mpi2d_alltoallv_send_particle_2d_gy, &
                 tp_sort_particles_among_ranks_gy, &
-                sort_particles_among_ranks_gy
+                sort_particles_among_ranks_gy, &
+                partition_density_to_grid_gy_allmu
 
     
 contains
 
 !!! allocate all the particles located in one box to its mesh nodes  
-  subroutine partition_density_to_grid_ful(pic2d)
-    class(pic_para_total2d_base), pointer :: pic2d
+  subroutine partition_density_to_grid_ful(ful2d_head,pic2d)
+    class(pic_para_total2d_base), pointer,intent(inout) :: pic2d
   !  class(pic_field_2d_base), pointer :: field2d
+    class(ful2d_node),pointer, intent(in) :: ful2d_head
     class(ful2d_node), pointer :: temp
     real8 :: x(2), delta(2),xmin(2)
     int4  :: boxindex(4),index(2), rank
     int4 :: row=1, n1,n2, numproc1,numproc2
-    int4,dimension(:,:),pointer :: rw,re,rn,rs,rsw,rse,rne,rnw
-!    real8,dimension(:,:),pointer :: density
     int4 :: ierr, i
            
     delta(1)=pic2d%para2d%m_x1%delta_eta
@@ -57,29 +59,140 @@ contains
     xmin(1)=pic2d%para2d%m_x1%eta_min
     xmin(2)=pic2d%para2d%m_x2%eta_min
     
-    if(.not.associated(pic2d%ful2d_head)) then
+    if(.not.associated(ful2d_head)) then
        print*, "error: the particles are not sorted by the rank of processes"
        stop
     end if
     
-    temp=>pic2d%ful2d_head
+    temp=>ful2d_head
     do while(associated(temp))
       if(associated(temp%next)) then
          x(1:2)=temp%coords(1:2)
-         call singlepart_to_mesh(pic2d%field2d%den,x,delta,xmin)      
+         call singlepart_to_mesh(pic2d%field2d%denf,x,delta,xmin)      
          temp=>temp%next
       else
          exit
       end if
     end do
 
-    call combine_boundfield_between_neighbor_alltoall(pic2d%field2d%den,pic2d%para2d%numproc,pic2d%layout2d)    
+    call combine_boundfield_between_neighbor_alltoall(pic2d%field2d%denf,pic2d%para2d%numproc,pic2d%layout2d, &
+         pic2d%field2d%denf_e,pic2d%field2d%denf_s,pic2d%field2d%denf_w,pic2d%field2d%denf_n, &
+         pic2d%field2d%denf_ne,pic2d%field2d%denf_se,pic2d%field2d%denf_sw,pic2d%field2d%denf_nw)
+    
 !    deallocate(pic2d%ful2d_head)
-    nullify(pic2d%ful2d_head)
+    nullify(temp)
   
     return
   end subroutine partition_density_to_grid_ful
  
+
+  subroutine partition_density_to_grid_gy(gy2d_head,pic2d,box,re,rs,rw,rn,rne,rse,rsw,rnw)
+    class(pic_para_total2d_base), pointer :: pic2d
+    class(gy2d_node), pointer, intent(in) :: gy2d_head
+    real8,dimension(:,:),pointer,intent(inout) :: box,rw,re,rn,rs,rsw,rse,rne,rnw 
+    class(gy2d_node), pointer :: temp
+    real8 :: x(2), delta(2),xmin(2)
+    int4  :: boxindex(4),index(2), rank
+    int4 :: row=1, n1,n2, numproc1,numproc2
+    int4 :: ierr, i
+           
+    delta(1)=pic2d%para2d%m_x1%delta_eta
+    delta(2)=pic2d%para2d%m_x2%delta_eta
+    xmin(1)=pic2d%para2d%m_x1%eta_min
+    xmin(2)=pic2d%para2d%m_x2%eta_min
+    
+    if(.not.associated(gy2d_head)) then
+       print*, "error: the particles are not sorted by the rank of processes"
+       stop
+    end if
+    
+    temp=>gy2d_head
+    do while(associated(temp))
+      if(associated(temp%next)) then
+         x(1:2)=temp%coords(1:2)
+         call singlepart_to_mesh(box,x,delta,xmin)      
+         temp=>temp%next
+      else
+         exit
+      end if
+    end do
+
+    call combine_boundfield_between_neighbor_alltoall(box,pic2d%para2d%numproc,pic2d%layout2d, &
+          re,rs,rw,rn,rne,rse,rsw,rnw)
+
+    nullify(temp)
+  
+    return
+  end subroutine partition_density_to_grid_gy
+ 
+
+  subroutine partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d)
+    class(gy2dmu_node),dimension(:), pointer :: gy2dmu_head
+    class(pic_para_total2d_base), pointer :: pic2d
+    class(gy2dmu_node),dimension(:), pointer :: gy2dmutmp
+    int4 :: i,ierr,num1,num2,boxindex(4),rank,row,mu_num
+    real8 :: x(2), delta(2),xmin(2)
+
+    real8,dimension(:,:),pointer :: box,re,rs,rw,rn,rne,rse,rsw,rnw
+ 
+    row=pic2d%para2d%row
+    rank=pic2d%layout2d%collective%rank
+    mu_num=pic2d%para2d%mu_num
+    call get_layout_2d_box_index(pic2d%layout2d,rank,boxindex)
+    num1=boxindex(2)-boxindex(1)+1
+    num2=boxindex(4)-boxindex(3)+1
+    allocate(gy2dmutmp(1:mu_num))
+    
+    allocate(box(num1,num2),rw(num1,row),re(num1,row),rn(row,num2),rs(row,num2), & 
+             rsw(row,row),rse(row,row),rnw(row,row),rne(row,row),stat=ierr)
+
+    delta(1)=pic2d%para2d%m_x1%delta_eta
+    delta(2)=pic2d%para2d%m_x2%delta_eta
+    xmin(1)=pic2d%para2d%m_x1%eta_min
+    xmin(2)=pic2d%para2d%m_x2%eta_min
+  
+    do i=1,mu_num
+       if(.not.associated(gy2dmutmp(i)%ptr)) then
+         print*, "error: the particles are not stored in gy2dmutmp(i)%ptr)"
+         stop
+       end if
+       box=0.0
+       rw=0.0
+       re=0.0
+       rn=0.0
+       rs=0.0
+       rsw=0.0
+       rse=0.0
+       rnw=0.0
+       rne=0.0
+      
+       gy2dmutmp(i)%ptr=>gy2dmu_head(i)%ptr     
+       do while(associated(gy2dmutmp(i)%ptr))
+         if(associated(gy2dmutmp(i)%ptr%next)) then
+           x(1:2)=gy2dmutmp(i)%ptr%coords(1:2)
+           call singlepart_to_mesh(box,x,delta,xmin)      
+           gy2dmutmp(i)%ptr=>gy2dmutmp(i)%ptr%next
+         else
+           exit
+         end if
+       end do
+
+       call combine_boundfield_between_neighbor_alltoall(box,pic2d%para2d%numproc,pic2d%layout2d, &
+            re,rs,rw,rn,rne,rse,rsw,rnw)
+
+       pic2d%field2d%deng(i,:,:)=box
+       pic2d%field2d%deng_e(i,:,:)=re
+       pic2d%field2d%deng_s(i,:,:)=rs
+       pic2d%field2d%deng_w(i,:,:)=rw
+       pic2d%field2d%deng_n(i,:,:)=rn
+       pic2d%field2d%deng_ne(i,:,:)=rne
+       pic2d%field2d%deng_se(i,:,:)=rse
+       pic2d%field2d%deng_sw(i,:,:)=rsw
+       pic2d%field2d%deng_nw(i,:,:)=rnw
+    end do
+
+    deallocate(box,re,rs,rw,rn,rne,rse,rsw,rnw)
+  end subroutine partition_density_to_grid_gy_allmu
 
   !!!!!!!!! the arrangement of the trapezoid
   !!          3 ************* 4
@@ -121,6 +234,36 @@ contains
 
 !    print*, i,j,ptc_ratio
   end subroutine singlepart_to_mesh
+
+!  subroutine singlepart_to_mesh_allmu(density,x,delta,x_min)
+!    real8, dimension(:,:), intent(inout) :: density
+!    real8, dimension(:),  intent(inout) :: x, delta, x_min
+!!    int4,dimension(:),intent(in) :: index
+!    real8 :: trap_coord(4,2)
+!    real8 :: ptc_ratio(4)  !!!ptc->particle
+!    int4 :: low(2)
+!    int4 :: i,j, n
+!    n=size(x_min)
+!
+!!!$    allocate(trap_coord(2*n,n))
+!!!$    allocate(ptc_ratio(2*n))
+!    
+!    call grid_global_2dcoord(trap_coord,x,delta,x_min)
+!    call particle_to_2dgrid(ptc_ratio, trap_coord, x)
+!    call low_localindex_of_particle(low,x,x_min,delta)
+!    
+!    !!! here only consider two-dimensional case, n=2
+!    i=low(1)
+!    j=low(2)
+!    density(i+1,j)=density(i+1,j)+ ptc_ratio(3)
+!    density(i+1,j+1)=density(i+1,j+1)+ptc_ratio(4)
+!    density(i,j)=density(i,j)+ptc_ratio(1)
+!    density(i,j+1)=density(i,j+1)+ptc_ratio(2)
+!
+!!    print*, i,j,ptc_ratio
+!  end subroutine singlepart_to_mesh_allmu
+
+
 
 !!!! The lower index of the closet grid  which surrounds the particle
   subroutine low_localindex_of_particle(low,x,x_min,delta)
@@ -220,7 +363,7 @@ contains
        if(.not.associated(tmp%next)) then
          exit
        else
-         call coordinates_pointoutbound_per_per(tmp%coords(1:2),pic2d%para2d%gxmin,pic2d%para2d%gxmax)
+!         call coordinates_pointoutbound_per_per(tmp%coords(1:2),pic2d%para2d%gxmin,pic2d%para2d%gxmax)
          prank=compute_process_of_point_per_per(tmp%coords(1:2),pic2d%para2d%numproc,pic2d%para2d%gxmin, &
                pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)           
          if(prank.ne.rank) then
@@ -303,7 +446,7 @@ contains
        if(.not.associated(tmp%next)) then
          exit
        else
-         call coordinates_pointoutbound_per_per(tmp%coords(1:2),pic2d%para2d%gxmin,pic2d%para2d%gxmax)
+!         call coordinates_pointoutbound_per_per(tmp%coords(1:2),pic2d%para2d%gxmin,pic2d%para2d%gxmax)
          prank=compute_process_of_point_per_per(tmp%coords(1:2),pic2d%para2d%numproc,pic2d%para2d%gxmin, &
                pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)           
          if(prank.ne.rank) then
@@ -330,7 +473,7 @@ contains
        if(.not.associated(tmp%next)) then
          exit
        else
-         call coordinates_pointoutbound_per_per(tmp%coords(1:2),pic2d%para2d%gxmin,pic2d%para2d%gxmax)
+!         call coordinates_pointoutbound_per_per(tmp%coords(1:2),pic2d%para2d%gxmin,pic2d%para2d%gxmax)
          prank=compute_process_of_point_per_per(tmp%coords(1:2),pic2d%para2d%numproc,pic2d%para2d%gxmin, &
                pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)         
          if(prank.ne.rank) then
@@ -363,9 +506,6 @@ contains
      nullify(outcur)
    end subroutine sort_particles_among_ranks_gy
 
-
-
-
    subroutine tp_sort_particles_among_ranks(tp_ful2d_head,tp_ful2dsend_head, pic2d, num)
      class(pic_para_total2d_base), pointer :: pic2d
      class(tp_ful2d_node), pointer, intent(inout) :: tp_ful2d_head
@@ -389,7 +529,7 @@ contains
        if(.not.associated(tmp%next)) then
          exit
        else
-         call coordinates_pointoutbound_per_per(tmp%coords(1:2),pic2d%para2d%gxmin,pic2d%para2d%gxmax)
+!         call coordinates_pointoutbound_per_per(tmp%coords(1:2),pic2d%para2d%gxmin,pic2d%para2d%gxmax)
          prank=compute_process_of_point_per_per(tmp%coords(1:2),pic2d%para2d%numproc,pic2d%para2d%gxmin, &
                pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)           
          if(prank.ne.rank) then
@@ -417,7 +557,7 @@ contains
        if(.not.associated(tmp%next)) then
          exit
        else
-         call coordinates_pointoutbound_per_per(tmp%coords(1:2),pic2d%para2d%gxmin,pic2d%para2d%gxmax)
+!         call coordinates_pointoutbound_per_per(tmp%coords(1:2),pic2d%para2d%gxmin,pic2d%para2d%gxmax)
          prank=compute_process_of_point_per_per(tmp%coords(1:2),pic2d%para2d%numproc,pic2d%para2d%gxmin, &
                pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)         
          if(prank.ne.rank) then
@@ -452,90 +592,93 @@ contains
      nullify(tmphead)
    end subroutine tp_sort_particles_among_ranks
 
-   subroutine tp_sort_particles_among_ranks_gy(tp_gy2d_head,tp_gy2dsend_head, pic2d, num)
+   subroutine tp_sort_particles_among_ranks_gy(tp_gy2dmu_head,tp_gy2dsend_head, muind,pic2d, num)
      class(pic_para_total2d_base), pointer :: pic2d
-     class(tp_gy2d_node), pointer, intent(inout) :: tp_gy2d_head
+     class(tp_gy2dallmu_node), dimension(:), pointer, intent(inout) :: tp_gy2dmu_head
      class(tp_gy2dsend_node),dimension(:), pointer, intent(inout) :: tp_gy2dsend_head
      int4, dimension(:), pointer, intent(inout) :: num
-     class(tp_gy2d_node), pointer :: tmp,tmphead
+     int4, intent(in) :: muind
+     class(tp_gy2dallmu_node),dimension(:), pointer :: tmp,tmphead
      class(tp_gy2dsend_node),dimension(:), pointer :: outcur
-     int4 :: size,rank,prank
+     int4 :: size,rank,prank,mu_num
      real8 :: coords(4)
      int4 :: i,j
  
      rank=pic2d%layout2d%collective%rank
      size=pic2d%layout2d%collective%size
+     mu_num=pic2d%para2d%mu_num
      allocate(outcur(0:size-1))
-     tmp=>tp_gy2d_head
+     allocate(tmp(mu_num),tmphead(mu_num))
+     tmp(muind)%ptr=>tp_gy2dmu_head(muind)%ptr
      do i=0,size-1
         outcur(i)%ptr=>tp_gy2dsend_head(i)%ptr
      end do
 
-     do while(associated(tmp))
-       if(.not.associated(tmp%next)) then
+     do while(associated(tmp(muind)%ptr))
+       if(.not.associated(tmp(muind)%ptr%next)) then
          exit
        else
-         call coordinates_pointoutbound_per_per(tmp%coords(1:2),pic2d%para2d%gxmin,pic2d%para2d%gxmax)
-         prank=compute_process_of_point_per_per(tmp%coords(1:2),pic2d%para2d%numproc,pic2d%para2d%gxmin, &
+!         call coordinates_pointoutbound_per_per(tmp(muind)%ptr%coords(1:2),pic2d%para2d%gxmin,pic2d%para2d%gxmax)
+         prank=compute_process_of_point_per_per(tmp(muind)%ptr%coords(1:2),pic2d%para2d%numproc,pic2d%para2d%gxmin, &
                pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)           
          if(prank.ne.rank) then
             num(prank)=num(prank)+1
-            outcur(prank)%ptr%coords=tmp%coords
-            outcur(prank)%ptr%tp=tmp%tp
+            outcur(prank)%ptr%coords=tmp(muind)%ptr%coords
+            outcur(prank)%ptr%tp=tmp(muind)%ptr%tp
             allocate(outcur(prank)%ptr%next)
             outcur(prank)%ptr=>outcur(prank)%ptr%next
 
 ! delete this particle from the ful2d_head list
-            tmp=>tmp%next
-            tp_gy2d_head=>tmp
+            tmp(muind)%ptr=>tmp(muind)%ptr%next
+            tp_gy2dmu_head(muind)%ptr=>tmp(muind)%ptr
 
          else 
 !!!!tmphead points to pic2d%ful2d_head for the first time
             num(rank)=num(rank)+1
-            tmphead=>tp_gy2d_head           
-            tmp=>tmp%next
+            tmphead(muind)%ptr=>tp_gy2dmu_head(muind)%ptr           
+            tmp(muind)%ptr=>tmp(muind)%ptr%next
             exit
          end if
        end if
     end do
 
-    do while(associated(tmp))
-       if(.not.associated(tmp%next)) then
+    do while(associated(tmp(muind)%ptr))
+       if(.not.associated(tmp(muind)%ptr%next)) then
          exit
        else
-         call coordinates_pointoutbound_per_per(tmp%coords(1:2),pic2d%para2d%gxmin,pic2d%para2d%gxmax)
-         prank=compute_process_of_point_per_per(tmp%coords(1:2),pic2d%para2d%numproc,pic2d%para2d%gxmin, &
+!         call coordinates_pointoutbound_per_per(tmp(muind)%ptr%coords(1:2),pic2d%para2d%gxmin,pic2d%para2d%gxmax)
+         prank=compute_process_of_point_per_per(tmp(muind)%ptr%coords(1:2),pic2d%para2d%numproc,pic2d%para2d%gxmin, &
                pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)         
          if(prank.ne.rank) then
            num(prank)=num(prank)+1
           ! delete this particle from the ful2d_head list
           !  add the deleted particle to full2drank_head list
-           outcur(prank)%ptr%coords=tmp%coords
-           outcur(prank)%ptr%tp=tmp%tp 
+           outcur(prank)%ptr%coords=tmp(muind)%ptr%coords
+           outcur(prank)%ptr%tp=tmp(muind)%ptr%tp 
            allocate(outcur(prank)%ptr%next)
            outcur(prank)%ptr=>outcur(prank)%ptr%next
 !           tmp=>tmp%next
 !          !!! The following "if" is critical
-           if(.not.associated(tmp%next%next)) then
-              tmphead%next=>tmp%next
-              tmphead=>tmphead%next
+           if(.not.associated(tmp(muind)%ptr%next%next)) then
+              tmphead(muind)%ptr%next=>tmp(muind)%ptr%next
+              tmphead(muind)%ptr=>tmphead(muind)%ptr%next
               exit
            else 
-              tmp=>tmp%next
+              tmp(muind)%ptr=>tmp(muind)%ptr%next
            end if
          else
            num(rank)=num(rank)+1
-           tmphead%next=>tmp
-           tmphead=>tmphead%next
-           tmp=>tmp%next
+           tmphead(muind)%ptr%next=>tmp(muind)%ptr
+           tmphead(muind)%ptr=>tmphead(muind)%ptr%next
+           tmp(muind)%ptr=>tmp(muind)%ptr%next
          end if
 
        endif
     end do
     
      nullify(outcur)
-     nullify(tmp)
-     nullify(tmphead)
+     deallocate(tmp)
+     deallocate(tmphead)
    end subroutine tp_sort_particles_among_ranks_gy
 
 
@@ -761,27 +904,31 @@ contains
 
  end subroutine mpi2d_alltoallv_send_particle_2d
 
- subroutine mpi2d_alltoallv_send_particle_2d_gy(gy2d_head,gy2dsend_head,num,pic2d)
+ subroutine mpi2d_alltoallv_send_particle_2d_gy(gy2dmu_head,gy2dsend_head,num,muind,pic2d)
     class(pic_para_total2d_base), pointer :: pic2d
     class(gy2dsend_node), dimension(:), pointer, intent(in) :: gy2dsend_head
-    class(gy2d_node), pointer, intent(inout) :: gy2d_head
+    class(gy2dmu_node), dimension(:),pointer, intent(inout) :: gy2dmu_head
     int4, dimension(:), pointer, intent(in) :: num
-    int4 :: numgr
+    int4, intent(in) :: muind
+    int4 :: numgr,mu_num
 !    int4, intent(in) :: rank,size,comm
     int4, dimension(:),pointer :: rcounts,scounts,sdispls,rdispls,rbuf0
     real8, dimension(:), pointer :: sbuf,rbuf
     int4 :: i,j,h,numout,ierr, rank,size,comm,numsend
     class(gy2dsend_node),dimension(:), pointer :: rankcur
-    class(gy2d_node),     pointer :: coordcur
+    class(gy2dmu_node),dimension(:),   pointer :: coordcur
 
     numgr=3
     rank=pic2d%layout2d%collective%rank
     size=pic2d%layout2d%collective%size
     comm=pic2d%layout2d%collective%comm
+    mu_num=pic2d%para2d%mu_num
     allocate(rankcur(0:size-1))
     do i=0,size-1
        rankcur(i)%ptr=>gy2dsend_head(i)%ptr
     end do    
+    allocate(coordcur(1:mu_num))
+    coordcur(muind)%ptr=>gy2dmu_head(muind)%ptr
     allocate(rcounts(0:size-1),scounts(0:size-1),sdispls(0:size-1),rdispls(0:size-1),rbuf0(0:size-1))
     call mpi_alltoall(num,1,mpi_integer,rbuf0,1,mpi_integer,comm,ierr)
     call prep_for_mpi_alltoallv_with_zeroinput(rank,size,numgr,num,rbuf0,scounts, &
@@ -824,14 +971,14 @@ contains
    end if
 
 !!! insert the particles into the tail of the head linked list 
-   if(.not.associated(gy2d_head)) then
-       print*, "gy2d_head is not allocated"
+   if(.not.associated(gy2dmu_head(muind)%ptr)) then
+       print*, "gy2d_head(muind)%ptr is not allocated, muind=",muind
        stop
    end if
-   coordcur=>gy2d_head
-   do while(associated(coordcur))
-      if(associated(coordcur%next)) then
-         coordcur=>coordcur%next
+
+   do while(associated(coordcur(muind)%ptr))
+      if(associated(coordcur(muind)%ptr%next)) then
+         coordcur(muind)%ptr=>coordcur(muind)%ptr%next
       else 
          exit    
       end if
@@ -841,14 +988,14 @@ contains
      goto 20
    else
      do i=0,numout-1
-        coordcur%coords(1:3)=rbuf(4*i:4*i+2)
-        allocate(coordcur%next)
-        coordcur=>coordcur%next
+        coordcur(muind)%ptr%coords(1:3)=rbuf(4*i:4*i+2)
+        allocate(coordcur(muind)%ptr%next)
+        coordcur(muind)%ptr=>coordcur(muind)%ptr%next
      end do
 20   end if
 
    deallocate(rankcur)
-   nullify(coordcur)
+   deallocate(coordcur)
 
  end subroutine mpi2d_alltoallv_send_particle_2d_gy
 
@@ -996,23 +1143,30 @@ contains
    nullify(coordcur)
    end subroutine tp_mpi2d_alltoallv_send_particle_2d
 
- subroutine tp_mpi2d_alltoallv_send_particle_2d_gy(tp_gy2d_head,numleft, &
-             tp_gy2dsend_head,num,numgr,pic2d)
+ subroutine tp_mpi2d_alltoallv_send_particle_2d_gy(tp_gy2dmu_head,numleft, &
+             tp_gy2dsend_head,num,numgr,muind,pic2d)
     class(pic_para_total2d_base), pointer :: pic2d
-    class(tp_gy2dsend_node), dimension(:),pointer, intent(in) :: tp_gy2dsend_head
-    class(tp_gy2d_node), pointer, intent(inout) :: tp_gy2d_head
+    class(tp_gy2dsend_node), dimension(:), pointer, intent(in) :: tp_gy2dsend_head
+    class(tp_gy2dallmu_node),dimension(:), pointer,intent(inout)  :: tp_gy2dmu_head
     int4, dimension(:), pointer, intent(in) :: num
+    int4, intent(in) :: muind
     int4, intent(inout) :: numleft
     int4, intent(in) :: numgr
     int4, dimension(:),pointer :: rcounts,scounts,sdispls,rdispls
     real8, dimension(:), pointer :: sbuf,rbuf
     class(tp_gy2dsend_node),dimension(:), pointer :: rankcur
-    class(tp_gy2d_node),     pointer :: coordcur
+    class(tp_gy2dallmu_node),dimension(:),   pointer :: coordcur
     int4 :: i,j,h,ierr,rank,size,comm, nums,numre
+    int4 :: mu_num 
  
     rank=pic2d%layout2d%collective%rank
     size=pic2d%layout2d%collective%size
     comm=pic2d%layout2d%collective%comm
+    mu_num=pic2d%para2d%mu_num
+    allocate(coordcur(1:mu_num))
+    do i=1,mu_num
+      coordcur(i)%ptr=>tp_gy2dmu_head(i)%ptr 
+    end do
     allocate(rankcur(0:size-1))
     do i=0,size-1
        rankcur(i)%ptr=>tp_gy2dsend_head(i)%ptr
@@ -1113,14 +1267,14 @@ contains
     end if
 
 !!! insert the particle into the head linked list 
-   if(.not.associated(tp_gy2d_head)) then
-      print*, "tp_gy2d_head is not allocated"
+   if(.not.associated(coordcur(muind)%ptr)) then
+      print*, "tp_gy2dmu(muind)_head is not allocated, muind=", muind
       stop
    end if
-   coordcur=>tp_gy2d_head
-   do while(associated(coordcur))
-      if(associated(coordcur%next)) then
-         coordcur=>coordcur%next
+
+   do while(associated(coordcur(muind)%ptr))
+      if(associated(coordcur(muind)%ptr%next)) then
+         coordcur(muind)%ptr=>coordcur(muind)%ptr%next
       else 
          exit 
       end if
@@ -1130,15 +1284,15 @@ contains
      goto 10
    else
      do i=0,numre-1
-          coordcur%coords(1:numgr-1)=rbuf(numgr*i:numgr*i+numgr-2)
-          coordcur%tp = NINT(rbuf(numgr*i+numgr-1))
-          allocate(coordcur%next)
-          coordcur=>coordcur%next
+          coordcur(muind)%ptr%coords(1:numgr-1)=rbuf(numgr*i:numgr*i+numgr-2)
+          coordcur(muind)%ptr%tp = NINT(rbuf(numgr*i+numgr-1))
+          allocate(coordcur(muind)%ptr%next)
+          coordcur(muind)%ptr=>coordcur(muind)%ptr%next
      end do
 10   end if
 
    deallocate(rankcur)
-   nullify(coordcur)
+   deallocate(coordcur)
    deallocate(rcounts,scounts,rdispls,sdispls)
    end subroutine tp_mpi2d_alltoallv_send_particle_2d_gy
 
