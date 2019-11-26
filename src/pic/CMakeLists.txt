@@ -2,4 +2,5 @@
 Add_Subdirectory(pic_utilities)
 Add_Subdirectory(move_particles)
 Add_Subdirectory(random_sample)
+ADD_Subdirectory(tp_preparation)
 Add_Subdirectory(testing)

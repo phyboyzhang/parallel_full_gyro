@@ -93,7 +93,7 @@ contains
         else if(epkind=="eqp_sin") then
           xmid=(xmax(1)+xmin(1))/2.0_F64
 !          epo=wapone*(sin(wavenumber_one*x(1))+cos(wavenumber_two*x(2)))+wapeq*sin(pi_/xmid*(x(1)-xmid))
-          epo=wapone*sin(wavenumber_one*x(1))+wapeq*sin(pi_/xmid*(x(2)-xmid))
+          epo=wapone*(sin(wavenumber_one*x(1))+cos(wavenumber_two)*x(2))+wapeq*sin(x(2))+wapeq*cos(x(1))
  
         end if
 
@@ -262,6 +262,7 @@ contains
                  do i=1, ND(1)-1
                     x(1:2)=coords_from_localind((/i,j/),rank,pic2d%para2d%gboxmin,delta)
                     pic2d%field2d%ep(i,j)=epotential_2d(amp,amp_eq,wave_one,wave_two,xmin,xmax, x,epkind)
+                    pic2d%field2d%gep(i,j)=epotential_2d(amp,amp_eq,wave_one,wave_two,xmin,xmax, x,epkind)
                  end do
              end do              
             else if(coords(1).ne.numproc(1)-1.and.coords(2)==numproc(2)-1) then
@@ -269,6 +270,7 @@ contains
                  do i=1, ND(1)
                     x(1:2)=coords_from_localind((/i,j/),rank,pic2d%para2d%gboxmin,delta)
                     pic2d%field2d%ep(i,j)=epotential_2d(amp,amp_eq,wave_one,wave_two,xmin,xmax,x,epkind)              
+                    pic2d%field2d%gep(i,j)=epotential_2d(amp,amp_eq,wave_one,wave_two,xmin,xmax,x,epkind)               
                  end do
               end do
             else if(coords(1)==numproc(1)-1.and.coords(2)==numproc(2)-1)   then
@@ -276,6 +278,7 @@ contains
                   do i=1,Nd(1)-1
                     x(1:2)=coords_from_localind((/i,j/),rank,pic2d%para2d%gboxmin,delta)
                     pic2d%field2d%ep(i,j)=epotential_2d(amp,amp_eq,wave_one,wave_two,xmin,xmax,x,epkind)
+                    pic2d%field2d%gep(i,j)=epotential_2d(amp,amp_eq,wave_one,wave_two,xmin,xmax,x,epkind) 
                   end do
                end do
             else
@@ -283,11 +286,13 @@ contains
                   do i=1,Nd(1)
                     x(1:2)=coords_from_localind((/i,j/),rank,pic2d%para2d%gboxmin,delta)
                     pic2d%field2d%ep(i,j)=epotential_2d(amp,amp_eq,wave_one,wave_two,xmin,xmax,x,epkind)
+                    pic2d%field2d%gep(i,j)=epotential_2d(amp,amp_eq,wave_one,wave_two,xmin,xmax,x,epkind) 
                   end do
                end do
             end if                           
 
          call copy_boundary_value_per_per(pic2d%field2d%ep,rank,pic2d%para2d%numproc,pic2d%layout2d)
+         call copy_boundary_value_per_per(pic2d%field2d%gep,rank,pic2d%para2d%numproc,pic2d%layout2d)
         
             do j=1,Nd(2)+1
                do i=1, Nd(1)+1

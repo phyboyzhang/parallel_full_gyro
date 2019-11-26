@@ -21,7 +21,7 @@ module m_moveparticles
   use m_picutilities, only: mpi2d_alltoallv_send_particle_2d
   use paradata_utilities, only: compute_process_of_point_per_per
 
-  use m_para_orbit, only: borissolve, fulrk4solve,gyrork4solve,boris_single
+  use m_para_orbit, only: borissolve, fulrk4solve,boris_single
   implicit none
 
   public :: new_list_ful2d_per_per, &
@@ -232,14 +232,14 @@ contains
 
   end subroutine
 
-  subroutine advance_particles_among_ranks_gy(gy2d_head,pic2d,iter_num)
-    class(pic_para_total2d_base), pointer :: pic2d 
-    class(gy2d_node), pointer, intent(inout) :: gy2d_head
-    int4,intent(in) :: iter_num
-
-    call gyrork4solve(gy2d_head,pic2d,iter_num)
-
-  end subroutine
+!  subroutine advance_particles_among_ranks_gy(gy2d_head,pic2d,iter_num)
+!    class(pic_para_total2d_base), pointer :: pic2d 
+!    class(gy2d_node), pointer, intent(inout) :: gy2d_head
+!    int4,intent(in) :: iter_num
+!
+!    call gyrork4solve(gy2d_head,pic2d,iter_num)
+!
+!  end subroutine
 
 
   

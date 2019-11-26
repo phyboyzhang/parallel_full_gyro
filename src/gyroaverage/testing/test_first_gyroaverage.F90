@@ -7,7 +7,9 @@ use paradata_type, only: pic_para_2d_base, &
                               pic_para_total2d_base
 use paradata_layout, only:    initialize_pic_para_2d_base, &
                               initialize_pic_para_total2d_base, &
-                              allocate_memory_to_field_2d
+                              allocate_memory_to_field_2d_ful, &
+                              allocate_memory_to_field_2d_gy, &
+                              allocate_memory_to_magfield_2d
                               
 use utilities_module, only: f_is_power_of_two
 use m_mpilayout, only : initialize_layout_with_distributed_2d_array, &
@@ -159,7 +161,9 @@ end if
     num1=pic2d%layout2d%boxes(rank)%i_max-pic2d%layout2d%boxes(rank)%i_min+1
     num2=pic2d%layout2d%boxes(rank)%j_max-pic2d%layout2d%boxes(rank)%j_min+1                    
 
-    call allocate_memory_to_field_2d(pic2d%field2d,num1,num2,row)
+call allocate_memory_to_field_2d_ful(pic2d%field2d,num1,num2,row)
+call allocate_memory_to_field_2d_gy(pic2d%field2d,num1,num2,row,1)
+call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
     boxindex(1)=pic2d%layout2d%boxes(rank)%i_min
     boxindex(2)=pic2d%layout2d%boxes(rank)%i_max
     boxindex(3)=pic2d%layout2d%boxes(rank)%j_min
@@ -288,7 +292,7 @@ call mpi_barrier(comm)
 
 if(rank==1) then
    do i=1,2
-   print*, "epgyro=",pic2d%field2d%epgyro(i,:)
+   print*, "epgyro=",pic2d%field2d%epgyro(1,i,:)
    end do
 end if
 

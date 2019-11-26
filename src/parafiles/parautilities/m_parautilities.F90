@@ -1364,21 +1364,6 @@ end if
     deallocate(sbuf,rbuf,scounts,rcounts,sdispls,rdispls)       
   end subroutine mpi2d_alltoallv_box_per_per    
 
-!  function get_rank_from_processcoords(coords,numproc)
-!     int4 :: coords(2),numproc(2)
-!     int4 :: get_rank_from_processcoords
-!      
-!     get_rank_from_processcoords=coords(2)*numproc(1)+coords(1)
-!  end function
-!
-!  function get_coords_from_processrank(rank,numproc) result(coords)
-!     int4 :: rank,numproc(2)
-!     int4 :: coords(2)
-! 
-!     coords(1)=modulo(rank,numproc(1))
-!     coords(2)=(rank-coords(1))/numproc(1)
-!  end function   
-
 
   subroutine gather_field_to_rootprocess(rootfield,boxfield,rank,size,boxindex,numproc,layout2d,boundary)
  !    class(pic_para_total2d_base), pointer, intent(in) :: pic2d
@@ -1732,22 +1717,22 @@ subroutine gather_field_to_rootprocess_per_per(rootfield,boxfield,rank,size,boxi
    end subroutine scatter_field_from_rootprocess_per_per 
  
 !!!!! This is used to accumulate the value on the interpolation point to the grid point
-   subroutine  combine_boundfield_between_neighbor_alltoall(box,numproc,layout2d)
+   subroutine  combine_boundfield_between_neighbor_alltoall(box,numproc,layout2d,re,rs,rw,rn,rne,rse,rsw,rnw)
       class(t_layout_2d),pointer,intent(in) :: layout2d
       real8, dimension(:,:), pointer, intent(inout) :: box
       int4, intent(in) :: numproc(2)
-      real8,dimension(:,:), pointer :: re,rs,rw,rn,rne,rse,rsw,rnw
+      real8,dimension(:,:), pointer,intent(inout) :: re,rs,rw,rn,rne,rse,rsw,rnw
       int4 :: index(4),myrank,IERR,comm,length(2)
       int4 :: row=1
       int4 :: i,j
 
-      comm=layout2d%collective%comm
-      call MPI_COMM_RANK(comm,myrank,ierr)
+      comm=layout2d%collective%comm 
+      myrank=layout2d%collective%rank
       call get_layout_2d_box_index(layout2d,myrank,index)
       length(1)=index(2)-index(1)+1
       length(2)=index(4)-index(3)+1
-      allocate(re(length(1),row),rs(row,length(2)),rw(length(1),row), rn(row,length(2)))
-      allocate(rne(row,row),rse(row,row),rsw(row,row),rnw(row,row))
+!      allocate(re(length(1),row),rs(row,length(2)),rw(length(1),row), rn(row,length(2)))
+!      allocate(rne(row,row),rse(row,row),rsw(row,row),rnw(row,row))
       
       call mpi2d_alltoallv_box_per_per(row,comm,myrank,numproc, &
                                         box,rw,re,rn,rs,rsw,rse,rnw,rne,index)    
@@ -1763,5 +1748,39 @@ subroutine gather_field_to_rootprocess_per_per(rootfield,boxfield,rank,size,boxi
 
 
    end subroutine combine_boundfield_between_neighbor_alltoall
+
+   subroutine  allmu_combine_boundfield_between_neighbor_alltoall(box,numproc,layout2d,re,rs,rw,rn,rne,rse,rsw,rnw)
+      class(t_layout_2d),pointer,intent(in) :: layout2d
+      real8, dimension(:,:), pointer, intent(inout) :: box
+      int4, intent(in) :: numproc(2)
+      real8,dimension(:,:), pointer,intent(inout) :: re,rs,rw,rn,rne,rse,rsw,rnw
+      int4 :: index(4),myrank,IERR,comm,length(2)
+      int4 :: row=1
+      int4 :: i,j
+
+      comm=layout2d%collective%comm 
+      myrank=layout2d%collective%rank
+      call get_layout_2d_box_index(layout2d,myrank,index)
+      length(1)=index(2)-index(1)+1
+      length(2)=index(4)-index(3)+1
+!      allocate(re(length(1),row),rs(row,length(2)),rw(length(1),row), rn(row,length(2)))
+!      allocate(rne(row,row),rse(row,row),rsw(row,row),rnw(row,row))
+      
+      call mpi2d_alltoallv_box_per_per(row,comm,myrank,numproc, &
+                                        box,rw,re,rn,rs,rsw,rse,rnw,rne,index)    
+
+      box(:,1)=box(:,1)+rw(:,1)
+      box(:,length(2))=box(:,length(2))+re(:,1)
+      box(1,:)=box(1,:)+rs(1,:)
+      box(length(1),:)=box(length(1),:)+rn(1,:)
+      box(1,1)=box(1,1)+rsw(1,1)
+      box(length(1),1)=box(length(1),1)+rnw(1,1)
+      box(length(1),length(2))=box(length(1),length(2))+rne(1,1)
+      box(1,length(1))=box(1,length(1))+rse(1,1)
+
+
+   end subroutine allmu_combine_boundfield_between_neighbor_alltoall
+
+
 
 end module m_parautilities

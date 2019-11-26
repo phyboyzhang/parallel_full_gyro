@@ -39,7 +39,8 @@ include "mpif.h"
 
   public :: sort_quadraturepoint_among_process, &
             para_compute_gyroaverage_stiff_matrix, &
-            para_compute_gyroaverage_mesh_field
+            para_compute_gyroaverage_mesh_field, &
+            para_compute_gyroaverage_field_on_mesh
 
 contains
 
@@ -583,10 +584,227 @@ contains
 
   !!! given the original field on the mesh,this subroutine is used to compute
   !the gyroaverage potential on the mesh
-  subroutine  para_compute_gyroaverage_mesh_field(mu,mu_num,pic2d) 
+  subroutine  para_compute_gyroaverage_mesh_field(mu,muind,pic2d) 
         class(pic_para_total2d_base), pointer,intent(inout) :: pic2d
         !  real8,dimension(:), intent(in) :: mu
         real8, intent(in) :: mu
+        class(gyropoint_node),dimension(:), pointer :: pointhead,curpoint
+  !      int4, dimension(:), pointer,intent(inout) :: num_p
+        int4, intent(in) :: muind
+        int4, dimension(:), pointer :: rcounts,scounts,sdispls,rdispls,rcountsone, &
+        scountstwo,rcountstwo
+        real8,dimension(:), pointer :: sbuf,rbuf
+        real8, dimension(:), pointer :: sbuf2nd,rbuf2nd
+        int4 :: size,ierr,numout,comm
+        int4, dimension(:), pointer :: num_p
+        int4 :: nearind(2)
+        real8,dimension(:,:),pointer :: weight,val
+        real8 :: x(2),eta_min(2),eta_max(2),eta_star(2)
+        int4 :: ii(2), Nc(2), flag, ind(2), ell_1, ell_2,row(4)
+        int4 :: contrindex(4,2)  ! store the global indexes of the comtribution points
+        int4 :: globalind(2),startind(2),nx1,nx2,gridind(2),startgridind(2)
+        real8 :: fieldvalue, rho
+        int4 :: rank,dest,source,coords(2),coordsone(2),numproc(2),rankl, &
+                rankr,ranku,rankd,status
+        int4 :: l,i,j,h,m
+
+        allocate(weight(-1:2,-1:2), val(-1:2,-1:2))
+
+        rank=pic2d%layout2d%collective%rank
+        size=pic2d%para2d%numproc(1)*pic2d%para2d%numproc(2)
+        numproc=pic2d%para2d%numproc
+        comm=pic2d%layout2d%collective%comm
+        Nc(1) = pic2d%para2d%m_x1%nodes
+        Nc(2) = pic2d%para2d%m_x2%nodes
+        allocate(pointhead(0:size-1),curpoint(0:size-1))
+        allocate(rcounts(0:size-1),scounts(0:size-1),sdispls(0:size-1),rdispls(0:size-1))  
+        allocate(rcountsone(0:size-1),rcountstwo(0:size-1),scountstwo(0:size-1))
+        allocate(num_p(0:size-1))
+        num_p=0 
+        rcounts=0
+        scounts=0
+        sdispls=0
+        rdispls=0 
+        rcountsone=0
+        rcountstwo=0
+        scountstwo=0
+        do i=0,size-1
+          allocate(pointhead(i)%ptr)
+        curpoint(i)%ptr=>pointhead(i)%ptr
+        end do
+
+        call sort_quadraturepoint_among_process(mu,rank,pointhead,num_p,pic2d%para2d%N_points,pic2d)
+        call mpi_alltoall(num_p,1,mpi_integer,rcounts,1,mpi_integer,comm,ierr)
+        numout=0
+        do i=0,size-1
+          numout=numout+num_p(i)   
+        end do    
+        allocate(sbuf(0:numout*5-1))
+
+        numout=0
+        do i=0, size-1
+          numout=numout+rcounts(i)
+        end do
+        allocate(rbuf(0:numout*5-1))
+
+        do i=0,size-1
+          scounts(i)=num_p(i)*5
+          rcountsone(i)=rcounts(i)*5
+          if(i==0) then
+            sdispls(i)=0
+            rdispls(i)=0
+          else
+            sdispls(i)=sdispls(i-1)+scounts(i-1)
+            rdispls(i)=rdispls(i-1)+rcountsone(i-1)
+          end if
+        end do  
+
+        h=0
+        m=0
+        do i=0, size-1
+          do while(associated(curpoint(i)%ptr).and.associated(curpoint(i)%ptr%next))
+        !if(rank==3) then  
+        !m=m+1     
+        !print*, "i=",i,curpoint(i)%ptr%xpoint, curpoint(i)%ptr%gridrank,curpoint(i)%ptr%gridind(1), &
+        !            curpoint(i)%ptr%gridind(2),"m=",m
+        !end if
+            sbuf(5*h)=real(curpoint(i)%ptr%gridrank,8)
+            sbuf(5*h+1:5*h+2)=curpoint(i)%ptr%xpoint
+            sbuf(5*h+3)=real(curpoint(i)%ptr%gridind(1),8)
+            sbuf(5*h+4)=real(curpoint(i)%ptr%gridind(2),8)
+            curpoint(i)%ptr=>curpoint(i)%ptr%next
+            h=h+1
+
+          end do
+        end do
+!print*, "rank=",rank,"h=",h
+
+       call mpi_alltoallv(sbuf,scounts,sdispls,mpi_double_precision,rbuf,rcountsone,rdispls, &
+                        mpi_double_precision,comm,ierr)
+
+        rho = sqrt(2.0d0*mu)
+        row=pic2d%para2d%row
+        numproc(1)=pic2d%para2d%numproc(1)
+        numproc(2)=pic2d%para2d%numproc(2) 
+
+        numout=0
+        sdispls=0
+        do i=0,size-1
+        numout=numout+rcounts(i)
+        scountstwo(i)=3*rcounts(i)
+        if(i==0) then
+          sdispls(0)=0
+        else
+          sdispls(i)=sdispls(i-1)+scountstwo(i-1)
+        end if
+        end do 
+        allocate(sbuf2nd(0:numout*3-1), stat=ierr)
+
+        numout=0
+        rdispls=0
+        do i=0,size-1
+          numout=numout+num_p(i)
+          rcountstwo(i)=3*num_p(i)
+          if(i==0) then
+            rdispls(i)=0
+          else
+            rdispls(i)=rdispls(i-1)+rcountstwo(i-1)
+          end if
+        end do
+        allocate(rbuf2nd(0:3*numout-1),stat=ierr)
+
+        h=0
+        eta_min=(/pic2d%para2d%m_x1%eta_min,pic2d%para2d%m_x2%eta_min/)
+        eta_max=(/pic2d%para2d%m_x1%eta_max,pic2d%para2d%m_x2%eta_max/)
+     !   NC=(/pic2d%para2d%m_x1%nodes,pic2d%para2d%m_x1%nodes/)
+        do i=0,size-1
+          do j=1,rcounts(i)
+            x=rbuf(5*h+1:5*h+2)
+            call para_compute_spl2d_point_per_per_weight(weight,pic2d%para2d%m_x1,pic2d%para2d%m_x2,x,pic2d%para2d%row, &
+                        pic2d%field2d%gep_weight,pic2d%field2d%gepwg_w,pic2d%field2d%gepwg_e,pic2d%field2d%gepwg_n, &
+                        pic2d%field2d%gepwg_s, &
+                        pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se,pic2d%field2d%gepwg_ne,  &
+                        pic2d%field2d%epwg_nw )    
+            call s_localize_new(x,eta_min,eta_max,ii,eta_star,NC-(/1,1/),flag)
+            call s_contribution_spl(eta_star,val)
+            fieldvalue=0._f64
+            do m=-1,2
+              do l=-1,2
+                fieldvalue=fieldvalue+val(m,l)*weight(m,l)
+              end do
+            end do
+            sbuf2nd(3*h)=fieldvalue/real(pic2d%para2d%N_points,8)
+            sbuf2nd(3*h+1:3*h+2)=rbuf(5*h+3:5*h+4)  ! which is the local grid number
+            h=h+1
+         end do
+        end do
+        call mpi_alltoallv(sbuf2nd,scountstwo,sdispls,mpi_double_precision,rbuf2nd,rcountstwo, &
+                        rdispls,mpi_double_precision,comm,ierr) 
+        !print*, "rank=",rank,"rbuf2d=",rbuf2nd 
+
+        numout=0
+        do i=0,size-1
+          numout=numout+num_p(i)
+        end do
+        pic2d%field2d%epgyro=0.0
+        
+        h=0
+        do i=1,numout
+!          if(rank==7.and.rbuf2nd(3*h+2)==1.0) then
+!            print*, NINT(rbuf2nd(3*h+1)),NINT(rbuf2nd(3*h+2))
+!            print*, "rbuf2nd=", rbuf2nd(3*h)
+!          end if
+          pic2d%field2d%epgyro(muind,NINT(rbuf2nd(3*h+1)),NINT(rbuf2nd(3*h+2))) &
+            =pic2d%field2d%epgyro(muind,NINT(rbuf2nd(3*h+1)),NINT(rbuf2nd(3*h+2)))+rbuf2nd(3*h) 
+          h=h+1
+        end do
+
+        coords=get_coords_from_processrank(rank,numproc)
+        coordsone(1)=coords(1)
+        coordsone(2)=modulo(coords(2)-1,numproc(2))
+        rankl=get_rank_from_processcoords(coordsone,numproc)
+        coordsone(2)=modulo(coords(2)+1,numproc(2))
+        rankr=get_rank_from_processcoords(coordsone,numproc)        
+        call mpi_sendrecv(pic2d%field2d%epgyro(muind,1:Nc(1)-1,1),Nc(1)-1,mpi_double_precision,rankl,10,   & 
+             pic2d%field2d%epgyro(muind,1:Nc(1)-1,Nc(2)),Nc(1)-1,mpi_double_precision,rankr,10,comm,status,ierr)
+       
+        coordsone(2)=coords(2) 
+        coordsone(1)=modulo(coords(1)-1,numproc(1))
+        rankd=get_rank_from_processcoords(coordsone,numproc)
+        coordsone(1)=modulo(coords(1)+1,numproc(1))
+        ranku=get_rank_from_processcoords(coordsone,numproc)
+        call mpi_sendrecv(pic2d%field2d%epgyro(muind,1,1:Nc(2)-1),Nc(2)-1,mpi_double_precision,rankd,20,  &
+             pic2d%field2d%epgyro(muind,Nc(1),1:Nc(2)-1),Nc(2)-1,mpi_double_precision,ranku,20,comm,status,ierr)
+
+        coordsone(1)=coords(1)-1
+        coordsone(2)=coords(2)-1
+        rankd=get_rank_from_processcoords(coordsone,numproc)
+        coordsone(1)=coords(1)+1
+        coordsone(2)=coords(2)+1
+        ranku=get_rank_from_processcoords(coordsone,numproc)        
+        call mpi_sendrecv(pic2d%field2d%epgyro(muind,1,1),1,mpi_double_precision,rankd,30, &
+             pic2d%field2d%epgyro(muind,Nc(1),Nc(2)),1,mpi_double_precision,ranku,30,comm,status,ierr)         
+       !  deallocate(rcounts,scounts,sdispls,rdispls,rcountsone,scountstwo,rcountstwo, &
+                        !             sbuf2nd,rbuf2nd,sbuf,rbuf)
+        !
+
+!call mpi_barrier(comm)
+!       if(rank==4) then
+!       print*, "rank=",rank, "sbuf2nd=",sbuf2nd 
+!       end if
+
+     end subroutine  para_compute_gyroaverage_mesh_field
+
+
+  subroutine  para_compute_gyroaverage_field_on_mesh(mu,mu_num,pic2d,boxout, &
+              boxin,rwin,rein,rnin,rsin,rswin,rsein,rnwin,rnein) 
+        class(pic_para_total2d_base), pointer,intent(inout) :: pic2d
+        !  real8,dimension(:), intent(in) :: mu
+        real8, intent(in) :: mu
+        real8, dimension(:,:), pointer, intent(in) :: boxin,rwin,rein,rnin,rsin,rswin, &
+                                                     rsein,rnwin,rnein
+        real8, dimension(:,:), pointer, intent(inout) :: boxout
+                                              
         class(gyropoint_node),dimension(:), pointer :: pointhead,curpoint
   !      int4, dimension(:), pointer,intent(inout) :: num_p
         int4, intent(in) :: mu_num
@@ -720,9 +938,7 @@ contains
           do j=1,rcounts(i)
             x=rbuf(5*h+1:5*h+2)
             call para_compute_spl2d_point_per_per_weight(weight,pic2d%para2d%m_x1,pic2d%para2d%m_x2,x,pic2d%para2d%row, &
-                        pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n, &
-                        pic2d%field2d%epwg_s, &
-                pic2d%field2d%epwg_sw,  pic2d%field2d%epwg_se,pic2d%field2d%epwg_ne,pic2d%field2d%epwg_nw )    
+                        boxin,rwin,rein,rnin,rsin,rswin,rsein,rnwin,rnein)
             call s_localize_new(x,eta_min,eta_max,ii,eta_star,NC-(/1,1/),flag)
             call s_contribution_spl(eta_star,val)
             fieldvalue=0._f64
@@ -744,16 +960,16 @@ contains
         do i=0,size-1
           numout=numout+num_p(i)
         end do
-        pic2d%field2d%epgyro=0.0
         
+        boxout=0.0_f64
         h=0
         do i=1,numout
 !          if(rank==7.and.rbuf2nd(3*h+2)==1.0) then
 !            print*, NINT(rbuf2nd(3*h+1)),NINT(rbuf2nd(3*h+2))
 !            print*, "rbuf2nd=", rbuf2nd(3*h)
 !          end if
-          pic2d%field2d%epgyro(NINT(rbuf2nd(3*h+1)),NINT(rbuf2nd(3*h+2))) &
-            =pic2d%field2d%epgyro(NINT(rbuf2nd(3*h+1)),NINT(rbuf2nd(3*h+2)))+rbuf2nd(3*h) 
+          boxout(NINT(rbuf2nd(3*h+1)),NINT(rbuf2nd(3*h+2))) &
+            =boxout(NINT(rbuf2nd(3*h+1)),NINT(rbuf2nd(3*h+2)))+rbuf2nd(3*h) 
           h=h+1
         end do
 
@@ -763,16 +979,16 @@ contains
         rankl=get_rank_from_processcoords(coordsone,numproc)
         coordsone(2)=modulo(coords(2)+1,numproc(2))
         rankr=get_rank_from_processcoords(coordsone,numproc)        
-        call mpi_sendrecv(pic2d%field2d%epgyro(1:Nc(1)-1,1),Nc(1)-1,mpi_double_precision,rankl,10,   & 
-             pic2d%field2d%epgyro(1:Nc(1)-1,Nc(2)),Nc(1)-1,mpi_double_precision,rankr,10,comm,status,ierr)
+        call mpi_sendrecv(boxout(1:Nc(1)-1,1),Nc(1)-1,mpi_double_precision,rankl,10,   & 
+                          boxout(1:Nc(1)-1,Nc(2)),Nc(1)-1,mpi_double_precision,rankr,10,comm,status,ierr)
        
         coordsone(2)=coords(2) 
         coordsone(1)=modulo(coords(1)-1,numproc(1))
         rankd=get_rank_from_processcoords(coordsone,numproc)
         coordsone(1)=modulo(coords(1)+1,numproc(1))
         ranku=get_rank_from_processcoords(coordsone,numproc)
-        call mpi_sendrecv(pic2d%field2d%epgyro(1,1:Nc(2)-1),Nc(2)-1,mpi_double_precision,rankd,20,  &
-             pic2d%field2d%epgyro(Nc(1),1:Nc(2)-1),Nc(2)-1,mpi_double_precision,ranku,20,comm,status,ierr)
+        call mpi_sendrecv(boxout(1,1:Nc(2)-1),Nc(2)-1,mpi_double_precision,rankd,20,  &
+                          boxout(Nc(1),1:Nc(2)-1),Nc(2)-1,mpi_double_precision,ranku,20,comm,status,ierr)
 
         coordsone(1)=coords(1)-1
         coordsone(2)=coords(2)-1
@@ -780,8 +996,8 @@ contains
         coordsone(1)=coords(1)+1
         coordsone(2)=coords(2)+1
         ranku=get_rank_from_processcoords(coordsone,numproc)        
-        call mpi_sendrecv(pic2d%field2d%epgyro(1,1),1,mpi_double_precision,rankd,30, &
-             pic2d%field2d%epgyro(Nc(1),Nc(2)),1,mpi_double_precision,ranku,30,comm,status,ierr)         
+        call mpi_sendrecv(boxout(1,1),1,mpi_double_precision,rankd,30, &
+                          boxout(Nc(1),Nc(2)),1,mpi_double_precision,ranku,30,comm,status,ierr)         
        !  deallocate(rcounts,scounts,sdispls,rdispls,rcountsone,scountstwo,rcountstwo, &
                         !             sbuf2nd,rbuf2nd,sbuf,rbuf)
         !
@@ -791,7 +1007,8 @@ contains
 !       print*, "rank=",rank, "sbuf2nd=",sbuf2nd 
 !       end if
 
-     end subroutine  para_compute_gyroaverage_mesh_field
+     end subroutine  para_compute_gyroaverage_field_on_mesh
+
 
 
    subroutine store_data_on_rootprocess(mu,mu_num,rank,rootdata,pic2d)
@@ -850,7 +1067,7 @@ contains
       class(pic_para_total2d_base), pointer, intent(in) :: pic2d
       real8, dimension(:), pointer :: density
       int4 :: rank,size,boxindex(4)
-      int4 :: ierr, numdim,i,j,mu_num
+      int4 :: ierr, numdim,i,j,mu_num,num1,num2
       real8, dimension(:,:), pointer :: buf,buf1,buf2
       real8 :: mu
     
@@ -869,8 +1086,8 @@ contains
       allocate(density(numdim),stat=ierr)
       allocate(buf(boxindex(2)-boxindex(1)+1,boxindex(4)-boxindex(3)+1))
 
-      buf= pic2d%field2d%den-pic2d%field2d%denequ    
-      call gather_field_to_rootprocess_per_per(density,buf,rank, &
+!      buf= pic2d%field2d%den-pic2d%field2d%denequ    
+      call gather_field_to_rootprocess_per_per(density,pic2d%field2d%dengeqtot,rank, &
            size,boxindex,pic2d%para2d%numproc,pic2d%layout2d)
 
       if(rank==0) then
@@ -891,7 +1108,9 @@ contains
          endif
       end do
       do i=1,numdim
-        buf2(i,i)=buf2(i,i)+1.0_f64/pic2d%para2d%temp_i(i)+1.0_f64/pic2d%para2d%temp_e(i)
+        num1 = modulo(numdim,pic2d%layout2d%global_sz1)
+        num2 = (numdim-num1)/pic2d%layout2d%global_sz1+1
+        buf2(i,i)=buf2(i,i)+1.0_f64/pic2d%para2d%temp_i(num1,num2)+1.0_f64/pic2d%para2d%temp_e(num1,num2)
       end do
   
       LDA= numdim

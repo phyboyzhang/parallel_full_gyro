@@ -5,7 +5,7 @@ use paradata_utilities, only: prepare_recv_for_gatherv
 use paradata_type, only: pic_para_total2d_base
 use piclayout, only: root_precompute_data
 use m_mpilayout,only: get_layout_2d_box_index
-use orbit_data_base, only: tp_ful2d_node,tp_gy2d_node
+use orbit_data_base, only: tp_ful2d_node,tp_gy2d_node,tp_gy2dallmu_node
 implicit none
 include "mpif.h"
 
@@ -13,7 +13,8 @@ include "mpif.h"
             close_file, &
             para_write_field_file_2d, &
             para_write_orbit_file_2d, &
-            para_write_orbit_file_2d_gy            
+            para_write_orbit_file_2d_gy, &
+            para_write_orbit_file_2d_gy_allmu            
 contains
 
 
@@ -125,18 +126,30 @@ contains
     end subroutine para_write_orbit_file_2d 
 
 
-    subroutine para_write_orbit_file_2d_gy(tp_gy2d_head,numleft,numgr,fileitem,pic2d,iter_num)
-      class(tp_gy2d_node), pointer,intent(in) :: tp_gy2d_head
+    subroutine para_write_orbit_file_2d_gy(tp_gy2dallmu_head,numleft,numgr,muind,fileitem,pic2d,iter_num)
+      class(tp_gy2dallmu_node), dimension(:),pointer,intent(in) :: tp_gy2dallmu_head
       int4, intent(in) :: fileitem,numleft,numgr,iter_num
+      int4, intent(in) :: muind
       class(pic_para_total2d_base), pointer, intent(in) :: pic2d
       int4, dimension(:),pointer :: rcounts,rdispls 
       real8, dimension(:), pointer :: outarray
-      int4 :: numtot,size,rank,comm
-      
+      class(tp_gy2dallmu_node), dimension(:), pointer :: tpgy2dmutmp
+      class(tp_gy2d_node), pointer :: tpgy2d_head, tpgy2dtmp
+      int4 :: numtot,size,rank,comm,mu_num
+      int4 :: mu_ind
+      int4 :: i
+    
+      mu_num=pic2d%para2d%mu_num  
       comm=pic2d%layout2d%collective%comm
       size=pic2d%layout2d%collective%size
       rank=pic2d%layout2d%collective%rank
       allocate(rcounts(0:size-1),rdispls(0:size-1))
+      allocate(tpgy2dmutmp(mu_num))
+      allocate(tpgy2d_head)
+      do i=1,mu_num
+        tpgy2dmutmp(i)%ptr=>tp_gy2dallmu_head(i)%ptr
+      end do
+
       call prepare_recv_for_gatherv(numtot,rcounts,rdispls,numleft,numgr,size,comm,rank) 
       if(rank==0) then
         allocate(outarray(1:(numtot/numgr)*(numgr-1)))
@@ -144,7 +157,19 @@ contains
         allocate(outarray(0:0))
       end if
 
-      call tp_gather_coords_to_rootprocess_gy(outarray,tp_gy2d_head,numleft,numtot,numgr,rcounts, &
+      tpgy2dtmp=>tpgy2d_head
+      do while(associated(tpgy2dmutmp(muind)%ptr))
+        if(.not.associated(tpgy2dmutmp(muind)%ptr%next)) then
+           exit
+        else
+          tpgy2dtmp%coords(1:3)=tpgy2dmutmp(muind)%ptr%coords(1:3)        
+          allocate(tpgy2dtmp%next)
+          tpgy2dtmp=>tpgy2dtmp%next
+          tpgy2dmutmp(muind)%ptr=>tpgy2dmutmp(muind)%ptr%next
+        end if
+      end do
+
+     call tp_gather_coords_to_rootprocess_gy(outarray,tpgy2d_head,numleft,numtot,numgr,rcounts, &
                                                rdispls,pic2d)
 
       if(rank==0) then
@@ -154,6 +179,61 @@ contains
       deallocate(rcounts,rdispls)
         deallocate(outarray)
     end subroutine para_write_orbit_file_2d_gy 
+
+    subroutine para_write_orbit_file_2d_gy_allmu(tp_gy2dallmu_head,numleft,numgr,fileitem,muind, & 
+               pic2d,iter_num)
+      class(tp_gy2dallmu_node), dimension(:),pointer,intent(in) :: tp_gy2dallmu_head
+      int4, intent(in) :: fileitem,numleft,numgr,iter_num
+      class(pic_para_total2d_base), pointer, intent(in) :: pic2d
+      int4, intent(in) :: muind
+      int4, dimension(:),pointer :: rcounts,rdispls 
+      real8, dimension(:), pointer :: outarray
+      int4 :: numtot,size,rank,comm,mu_num
+      int4 :: i      
+      class(tp_gy2dallmu_node), dimension(:), pointer :: tpgy2dmutmp
+      class(tp_gy2d_node), pointer :: tp_gy2d_head, tpgy2dtmp
+ 
+      comm=pic2d%layout2d%collective%comm
+      size=pic2d%layout2d%collective%size
+      rank=pic2d%layout2d%collective%rank
+      mu_num=pic2d%para2d%mu_num
+      allocate(tpgy2dmutmp(1:mu_num))
+      do i=1,mu_num
+        allocate(tpgy2dmutmp(i)%ptr)
+        tpgy2dmutmp(i)%ptr=>tp_gy2dallmu_head(i)%ptr
+      end do
+      allocate(rcounts(0:size-1),rdispls(0:size-1))
+      call prepare_recv_for_gatherv(numtot,rcounts,rdispls,numleft,numgr,size,comm,rank) 
+      if(rank==0) then
+        allocate(outarray(1:(numtot/numgr)*(numgr-1)))
+      else
+        allocate(outarray(0:0))
+      end if
+   
+     allocate(tp_gy2d_head)
+     tpgy2dtmp=>tp_gy2d_head
+      do while(associated(tpgy2dtmp)) 
+         if(.not.associated(tpgy2dtmp%next)) then
+           exit
+         else
+           tpgy2dtmp%coords(1:3)=tpgy2dmutmp(muind)%ptr%coords(1:3)
+           allocate(tpgy2dtmp%next)
+           tpgy2dtmp=>tpgy2dtmp%next
+           tpgy2dmutmp(muind)%ptr=>tpgy2dmutmp(muind)%ptr%next
+         end if
+      end do
+     
+      call tp_gather_coords_to_rootprocess_gy(outarray,tp_gy2d_head,numleft,numtot,numgr,rcounts, &
+                                               rdispls,pic2d)
+
+      if(rank==0) then
+         write(fileitem, *) iter_num,outarray(:)
+      end if
+
+      deallocate(rcounts,rdispls)
+        deallocate(outarray)
+      deallocate(tp_gy2d_head)
+    end subroutine para_write_orbit_file_2d_gy_allmu 
 
 
 

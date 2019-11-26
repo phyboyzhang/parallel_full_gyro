@@ -91,6 +91,10 @@ implicit none
      type(tp_gy2d_node), pointer :: next=>null()
   end type 
 
+  type :: tp_gy2dallmu_node
+     type(tp_gy2d_node),pointer :: ptr
+  end type 
+ 
   type :: tp_rk4ful2dnode
      real8 :: f1(6),f2(6),f3(6),f4(6)
      real8 :: vec(6)
@@ -110,7 +114,8 @@ implicit none
   end type
 
   public :: pointin_node, pointin_gy_node,fuloutnode,rk4ful2dnode,gyoutnode,rk4gy2dnode,&
-            tp_rk4gy2dnode, tp_ful2dsend_node, tp_gy2dsend_node
+            tp_rk4gy2dnode, tp_ful2dsend_node, tp_gy2dsend_node, &
+            tp_gy2dallmu_node
         
 
 
