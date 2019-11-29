@@ -1,7 +1,7 @@
 module m_fieldsolver
 #include "work_precision.h"
 
-use piclayout, only :   root_precompute_data
+use piclayout, only :   root_precompute_data, parameters_array_2d
 use m_para_spline, only: para_compute_spl2D_weight
 use paradata_type, only: pic_para_total2d_base
 use m_mpilayout, only: get_layout_2d_box_index
@@ -53,9 +53,10 @@ contains
      end subroutine  solve_weight_of_field_among_processes
 
 
-     subroutine solve_field_quasi_neutral(rank,rootdata,pic2d)
+     subroutine solve_field_quasi_neutral(rank,rootdata,pic2d,pamearray)
        class(root_precompute_data), pointer, intent(inout) :: rootdata
        class(pic_para_total2d_base), pointer, intent(inout) :: pic2d
+       class(parameters_array_2d), pointer, intent(in) :: pamearray
        int4, intent(in) :: rank
        real8, dimension(:), pointer :: density
        int4 :: dims,global_sz(2),sizeone,boxindex(4),num1,num2
@@ -91,16 +92,17 @@ contains
        deallocate(density,buffer)
      end subroutine solve_field_quasi_neutral
 
-     subroutine solve_field_ful(rootdata,pic2d)
+     subroutine solve_field_ful(rootdata,pic2d,pamearray)
        class(root_precompute_data), pointer, intent(inout) :: rootdata 
        class(pic_para_total2d_base), pointer, intent(inout) :: pic2d
+       class(parameters_array_2d), pointer, intent(in) :: pamearray
        int4 :: i,j,num1,num2
  
        num1=size(pic2d%field2d%denf,1)
        num2=size(pic2d%field2d%denf,2)
        do i=1,num1
          do j=1,num2
-            pic2d%field2d%denf(i,j)=pic2d%field2d%denf(i,j)*pic2d%para2d%temp_e(i,j)/ &
+            pic2d%field2d%denf(i,j)=pic2d%field2d%denf(i,j)*pamearray%temp_e(i,j)/ &
                                     pic2d%field2d%denfeq(i,j) 
          end do
        enddo
@@ -108,9 +110,10 @@ contains
          
      end subroutine
 
-     subroutine solve_gyfieldweight_from_fulfield(rootdata, pic2d)
+     subroutine solve_gyfieldweight_from_fulfield(rootdata, pic2d,pamearray)
        class(root_precompute_data), pointer, intent(inout) :: rootdata
        class(pic_para_total2d_base), pointer, intent(inout) :: pic2d
+       class(parameters_array_2d), pointer, intent(in) :: pamearray
        real8,dimension(:,:),pointer :: buf,box,re,rs,rw,rn,rne,rse,rsw,rnw 
        int4 :: i,ierr,num1,num2,row 
 
@@ -137,7 +140,7 @@ contains
          rse=0.0
          rnw=0.0
          rne=0.0 
-         call para_compute_gyroaverage_field_on_mesh(pic2d%para2d%mu_nodes(i),i,pic2d,buf, &
+         call para_compute_gyroaverage_field_on_mesh(pamearray%mu_nodes(i),i,pic2d,buf, &
               pic2d%field2d%gep_weight,pic2d%field2d%gepwg_w,pic2d%field2d%gepwg_e,pic2d%field2d%gepwg_n, &
               pic2d%field2d%gepwg_s, pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se, &
               pic2d%field2d%gepwg_nw,pic2d%field2d%gepwg_ne)
@@ -204,9 +207,10 @@ contains
 
      end subroutine
 
-     subroutine compute_gyrodensity_perturbation(rootdata,pic2d)
+     subroutine compute_gyrodensity_perturbation(rootdata,pic2d,pamearray)
        class(pic_para_total2d_base), pointer, intent(inout) :: pic2d
        class(root_precompute_data), pointer, intent(inout) :: rootdata
+       class(parameters_array_2d), pointer, intent(in) :: pamearray
        real8,dimension(:,:), pointer :: buf
        real8,dimension(:,:),pointer :: box,re,rs,rw,rn,rne,rse,rsw,rnw
        int4 :: i,num1,num2,row,comm,rank,numproc(2),boxindex(4),ierr     
@@ -247,7 +251,7 @@ contains
          pic2d%field2d%dengwg_ne(i,:,:)=rne
          
          buf=0.0            
-         call para_compute_gyroaverage_field_on_mesh(pic2d%para2d%mu_nodes(i),i,pic2d,buf, &
+         call para_compute_gyroaverage_field_on_mesh(pamearray%mu_nodes(i),i,pic2d,buf, &
               box,rw,re,rn,rs,rsw,rse,rnw,rne)
    
          pic2d%field2d%dengtot=pic2d%field2d%dengtot+buf

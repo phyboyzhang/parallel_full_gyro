@@ -3,7 +3,8 @@ module para_random_sample
   use omp_lib
   use utilities_module, only: gp_error
   use piclayout, only: &
-       ful2dsend_node,ful2d_node, gy2dmu_node, gy2d_node
+       ful2dsend_node,ful2d_node, gy2dmu_node, gy2d_node, &
+       parameters_array_2d
   use paradata_type, only: pic_para_total2d_base
 
   use constants, only: pi_
@@ -50,7 +51,7 @@ contains
     gmin=pic2d%para2d%gxmin
     gmax=pic2d%para2d%gxmax
 
-    if(.not.associated(pic2d%ful2d_head)) then
+    if(.not.associated(ful2d_head)) then
       print*, "pic2d%ful2d_head is not allocated"
       stop
     end if
@@ -219,8 +220,9 @@ contains
    end subroutine para_accprej_gaus2d2v_fulgyro_unifield_per_per  
 
 
-   subroutine para_accprej_gaus1d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d)
+   subroutine para_accprej_gaus1d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray)
     class(pic_para_total2d_base), pointer :: pic2d
+    class(parameters_array_2d), pointer, intent(in) :: pamearray
     class(ful2d_node), pointer, intent(inout) :: ful2d_head
     class(ful2dsend_node), dimension(:),pointer :: ful2dsend_head, fulcur
 !    class(gy2d_node), pointer, intent(inout) :: gy2d_head
@@ -234,7 +236,7 @@ contains
     class(gy2dmu_node), dimension(:), pointer :: gy2dmutmp
     int4, dimension(:), pointer :: munum_partion
     real8 :: theta, sigma, coords(4),rho,mumin,mumax,vperp,tempt
-    real8 :: sum
+    real8 :: integ
     int4 :: rank1,numcircle,size,rank,comm,mu_num
     int4 :: ierr,i,j,k
 
@@ -247,7 +249,7 @@ contains
     mu_num=pic2d%para2d%mu_num
     allocate(num(0:size-1),num_gy(0:size-1))
     allocate(fulcur(0:size-1),ful2dsend_head(0:size-1))
-    allocate(gycur(0:size-1), gy2dsend_head(0:size-1))
+    allocate(gycur(0:size-1))
     allocate(gy2dmutmp(1:mu_num))
     allocate(munum_partion(1:pic2d%para2d%mu_num))
     do i=0,size-1
@@ -256,7 +258,7 @@ contains
    end do
     ful2dtmp=>ful2d_head
  
-    do i=0,mu_num
+    do i=1,mu_num
        allocate(gy2dmu_head(i)%ptr)
        gy2dmutmp(i)%ptr=>gy2dmu_head(i)%ptr     
     end do
@@ -279,17 +281,25 @@ contains
 !      stop
 !    end if
 !    call random_seed()       
-  sum=0.0
+  integ=0.0
   do i=1,mu_num
-    sum=sum+pic2d%para2d%mu_nodes(i)*pic2d%para2d%mu_weights(i)
+    integ=integ+exp(-pamearray%mu_nodes(i)/pic2d%para2d%tempt)*pamearray%mu_weights(i)
   end do
+ 
   do i=1,mu_num
-    munum_partion(i)=NINT(real(pic2d%para2d%numparticle,8)*pic2d%para2d%mu_nodes(i)  &
-                     *pic2d%para2d%mu_weights(i)/sum)
+    munum_partion(i)=NINT(real(pic2d%para2d%numparticle,8)*exp(-pamearray%mu_nodes(i)/sigma)  &
+                     *pamearray%mu_weights(i)/integ)
   end do
+if(rank==0) then
+print*, "munum_partion=",munum_partion
+print*, "integ=",integ
+print*, "mu_nodes=",pamearray%mu_nodes
+print*, "mu_weights=",pamearray%mu_weights
+end if
 
   do j=1,mu_num    
     num_gy=0
+    allocate(gy2dsend_head(0:size-1))
     do k=0,size-1
        allocate(gy2dsend_head(k)%ptr)
        gycur(k)%ptr=>gy2dsend_head(k)%ptr
@@ -312,47 +322,50 @@ contains
       rank1=compute_process_of_point_per_per(y,pic2d%para2d%numproc,pic2d%para2d%gxmin, &
                pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)
       if(rank1==rank) then
-         gy2dmutmp(j)%ptr%coords(1:3)=(/y(1),y(2),pic2d%para2d%mu_nodes(j)/)
+         gy2dmutmp(j)%ptr%coords(1:3)=(/y(1),y(2),pamearray%mu_nodes(j)/)
          allocate(gy2dmutmp(j)%ptr%next)
          gy2dmutmp(j)%ptr=>gy2dmutmp(j)%ptr%next
          num_gy(rank)=num_gy(rank)+1
        else 
-         gycur(rank1)%ptr%coords(1:3)=(/y(1),y(2),pic2d%para2d%mu_nodes(j)/)
+         gycur(rank1)%ptr%coords(1:3)=(/y(1),y(2),pamearray%mu_nodes(j)/)
          allocate(gycur(rank1)%ptr%next)
          gycur(rank1)%ptr=>gycur(rank1)%ptr%next
          num_gy(rank1)=num_gy(rank1)+1
        end if
      
-     call mpi2d_alltoallv_send_particle_2d_gy(gy2dmu_head,gy2dsend_head,num_gy,j,pic2d)
-     deallocate(gy2dsend_head)
-
-     rho=sqrt(2._f64*pic2d%para2d%mu_nodes(j))
-     do k=0,numcircle-1
-           theta=real(k,8)*2.0_f64*pi_/real(numcircle,8)   
-           coords(1)=y(1)+rho*cos(theta)
-           coords(2)=y(2)+rho*sin(theta)      
-           coords(3)=rho*cos(theta+pi_/2.0_f64)
-           coords(4)=rho*sin(theta+pi_/2.0_f64) 
-!           call coordinates_pointoutbound_per_per(coords(1:2),pic2d) 
-           rank1=compute_process_of_point_per_per(coords(1:2),pic2d%para2d%numproc,pic2d%para2d%gxmin, &
-               pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)           
-         if(rank1==rank) then
-           ful2dtmp%coords(1:4)=coords(1:4)
-           allocate(ful2dtmp%next)
-           ful2dtmp=>ful2dtmp%next
-           num(rank)=num(rank)+1           
-         else
-           fulcur(rank1)%ptr%coords(1)=coords(1)
-           fulcur(rank1)%ptr%coords(2)=coords(2)
-           fulcur(rank1)%ptr%coords(3)=coords(3)
-           fulcur(rank1)%ptr%coords(4)=coords(4)
-           num(rank1)=num(rank1)+1 
-           allocate(fulcur(rank1)%ptr%next)
-           fulcur(rank1)%ptr=>fulcur(rank1)%ptr%next
-         end if
-      end do
+!     rho=sqrt(2._f64*pamearray%mu_nodes(j))
+!     do k=0,numcircle-1
+!           theta=real(k,8)*2.0_f64*pi_/real(numcircle,8)   
+!           coords(1)=y(1)+rho*cos(theta)
+!           coords(2)=y(2)+rho*sin(theta)      
+!           coords(3)=rho*cos(theta+pi_/2.0_f64)
+!           coords(4)=rho*sin(theta+pi_/2.0_f64) 
+!!           call coordinates_pointoutbound_per_per(coords(1:2),pic2d) 
+!           rank1=compute_process_of_point_per_per(coords(1:2),pic2d%para2d%numproc,pic2d%para2d%gxmin, &
+!               pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)           
+!         if(rank1==rank) then
+!           ful2dtmp%coords(1:4)=coords(1:4)
+!           allocate(ful2dtmp%next)
+!           ful2dtmp=>ful2dtmp%next
+!           num(rank)=num(rank)+1           
+!         else
+!           fulcur(rank1)%ptr%coords(1)=coords(1)
+!           fulcur(rank1)%ptr%coords(2)=coords(2)
+!           fulcur(rank1)%ptr%coords(3)=coords(3)
+!           fulcur(rank1)%ptr%coords(4)=coords(4)
+!           num(rank1)=num(rank1)+1 
+!           allocate(fulcur(rank1)%ptr%next)
+!           fulcur(rank1)%ptr=>fulcur(rank1)%ptr%next
+!         end if
+!      end do
 
     end do
+
+!     call mpi2d_alltoallv_send_particle_2d_gy(gy2dmu_head,gy2dsend_head,num_gy,j,pic2d)
+     print*, j
+     deallocate(gy2dsend_head)
+
+
 
   end do  !! end loop denoted by j
  

@@ -5,7 +5,8 @@ use piclayout, only: pic_field_2d_base, &
                      ful2d_node, &
                      ful2dsend_node, &
                      gy2d_node,  &
-                     gy2dsend_node
+                     gy2dsend_node, & 
+                     parameters_array_2d
 use m_mpilayout, only: t_layout_2d
 use orbit_data_base, only: tp_ful2d_node,tp_gy2d_node
 use utilities_module, only: muarray_euler_maclaurin_choice
@@ -18,6 +19,7 @@ public :: pic_para_2d_base, &
      type(t_layout_2d),        pointer  :: layout2d
      type(pic_field_2d_base),  pointer  :: field2d
      type(parameters_set_2d),  pointer  :: para2d
+!     type(parameters_array_2d), pointer :: para2darray
   end type pic_para_2d_base
 
 

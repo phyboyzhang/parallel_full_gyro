@@ -6,7 +6,8 @@ use cartesian_mesh,   only: cartesian_mesh_1d, &
 use paradata_type, only: pic_para_2d_base, &
                               pic_para_total2d_base
 use paradata_layout, only:    initialize_pic_para_total2d_base, &
-                              initialize_pic_para_total2d_base_2nd, &
+                              initialize_parameters_array_2d, &
+                              allocate_parameters_array_2d, &
                               allocate_memory_to_field_2d_ful, &
                               allocate_memory_to_field_2d_gy,  &
                               allocate_memory_to_magfield_2d
@@ -15,6 +16,7 @@ use utilities_module, only: f_is_power_of_two
 use m_mpilayout, only : initialize_layout_with_distributed_2d_array, &
                         get_layout_2d_box_index
 use piclayout, only :   root_precompute_data, &
+                        parameters_array_2d, &
                         initialize_rootdata_structure, &
                         ful2d_node,ful2dsend_node,gy2d_node,gy2dsend_node
 use m_parautilities, only: mpi2d_alltoallv_box_per_per, &
@@ -86,7 +88,8 @@ include "mpif.h"
 
     class(pic_para_total2d_base),pointer :: pic2d
  !   class(pic_para_total2d_base)
-    class(root_precompute_data), pointer :: rootdata
+    class(root_precompute_data), pointer :: rootdata 
+    class(parameters_array_2d),  pointer :: pamearray
     int4 :: rank,size,global_sz(2)
     real8 :: delta(2)
     int4  :: num1,num2,row
@@ -232,8 +235,8 @@ include "mpif.h"
     call initialize_layout_with_distributed_2d_array( &
       global_sz(1), &
       global_sz(2), &
-      pic2d%para2d%numproc(1), &
-      pic2d%para2d%numproc(2), &
+      numproc(1), &
+      numproc(2), &
       pic2d%layout2d, &
       pic2d%para2d%boundary)
     if(rank==0) then
@@ -241,10 +244,11 @@ include "mpif.h"
          print*, "size,boxes(i),",i,pic2d%layout2d%boxes(i)
        enddo  
     end if
-    call initialize_pic_para_total2d_base_2nd(pic2d)
-
+    
     global_sz(1)=pic2d%layout2d%global_sz1
     global_sz(2)=pic2d%layout2d%global_sz2 
+    pamearray=>allocate_parameters_array_2d(mu_num,global_sz)
+
 !    allocate(pic2d%para2d%gboxmin(0:size-1,2),pic2d%para2d%gboxmax(0:size-1,2))
   do i=0,pic2d%para2d%numproc(2)-1      
     do j=0,pic2d%para2d%numproc(1)-1
@@ -331,7 +335,7 @@ call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
   call para_compute_gyroaverage_mesh_field(pic2d%para2d%mu,1,pic2d)
 !print*, rank
   
-  call solve_gyfieldweight_from_fulfield(rootdata,pic2d)
+  call solve_gyfieldweight_from_fulfield(rootdata,pic2d,pamearray)
 
   call solve_weight_of_field_among_processes(pic2d%field2d%Bf03,rootdata%ASPL,rootdata,pic2d, &
        pic2d%field2d%bf03wg, pic2d%field2d%BF03wg_w,pic2d%field2d%bf03wg_e,pic2d%field2d%bf03wg_n, &
@@ -508,10 +512,10 @@ rk4order=4
         do j=1,pic2d%para2d%num_time 
            call tp_push_ful_orbit(tpful2d_head,numleft_boris,numgr,pic2d,"boris",rk4order,(i-1)*num_time+j)
 
-          call tp_push_ful_orbit(tprk4ful2d_head,numleft_rk4,numgr,pic2d,"rk4", rk4order,(i-1)*num_time+j)
+           call tp_push_ful_orbit(tprk4ful2d_head,numleft_rk4,numgr,pic2d,"rk4", rk4order,(i-1)*num_time+j)
 
            call para_write_orbit_file_2d(tpful2d_head,numleft_boris,numgr,fileitem_boris,pic2d,(i-1)*num_time+j) 
-          call para_write_orbit_file_2d(tprk4ful2d_head,numleft_rk4,numgr,fileitem_rk4,pic2d, (i-1)*num_time+j)
+           call para_write_orbit_file_2d(tprk4ful2d_head,numleft_rk4,numgr,fileitem_rk4,pic2d, (i-1)*num_time+j)
         end do
 
         call tp_push_gy_orbit_allmu(tpgy2dmu_head,numleft_gy,numgr_gy,pic2d,rk4order,i) 

@@ -16,7 +16,7 @@ use spline_module, only: s_splcoefper1d0old,&
                          s_localize_new      
 
 use m_para_spline, only: para_compute_spl2d_point_per_per_weight 
-use piclayout, only: root_precompute_data
+use piclayout, only: root_precompute_data, parameters_array_2d
 use paradata_type, only: pic_para_total2d_base
 use gyroaverage_2d_base, only: gyropoint_node, &
                               gyropoint, &
@@ -1062,9 +1062,10 @@ contains
 
    end subroutine store_data_on_rootprocess
 
-   subroutine precompute_doublegyroaverage_matrix(rootdata,pic2d)
+   subroutine precompute_doublegyroaverage_matrix(rootdata,pic2d,pamearray)
       class(root_precompute_data), pointer, intent(inout) :: rootdata
       class(pic_para_total2d_base), pointer, intent(in) :: pic2d
+      class(parameters_array_2d), pointer, intent(in) :: pamearray
       real8, dimension(:), pointer :: density
       int4 :: rank,size,boxindex(4)
       int4 :: ierr, numdim,i,j,mu_num,num1,num2
@@ -1094,7 +1095,7 @@ contains
         allocate(buf1(numdim,numdim),buf2(numdim,numdim))
       end if
       do j=1,mu_num
-         mu=pic2d%para2d%mu_nodes(j)   
+         mu=pamearray%mu_nodes(j)   
          buf1=0.0 
          rootdata%ACONTRI=0.0  
          call store_data_on_rootprocess(mu,j,rank,rootdata,pic2d)   
@@ -1104,13 +1105,13 @@ contains
              buf1(i,:)=buf1(i,:)*density(i)   ! ????
            end do
            buf1=matmul(rootdata%ASPL,buf1)
-           buf2=buf2+matmul(rootdata%ACONTRI,buf1)*pic2d%para2d%mu_weights(j)         
+           buf2=buf2+matmul(rootdata%ACONTRI,buf1)*pamearray%mu_weights(j)         
          endif
       end do
       do i=1,numdim
         num1 = modulo(numdim,pic2d%layout2d%global_sz1)
         num2 = (numdim-num1)/pic2d%layout2d%global_sz1+1
-        buf2(i,i)=buf2(i,i)+1.0_f64/pic2d%para2d%temp_i(num1,num2)+1.0_f64/pic2d%para2d%temp_e(num1,num2)
+        buf2(i,i)=buf2(i,i)+1.0_f64/pamearray%temp_i(num1,num2)+1.0_f64/pamearray%temp_e(num1,num2)
       end do
   
       LDA= numdim

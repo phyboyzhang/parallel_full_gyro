@@ -14,7 +14,8 @@ include "mpif.h"
             para_write_field_file_2d, &
             para_write_orbit_file_2d, &
             para_write_orbit_file_2d_gy, &
-            para_write_orbit_file_2d_gy_allmu            
+            para_write_orbit_file_2d_gy_allmu, &
+            allmu_para_write_field_file_2d            
 contains
 
 
@@ -83,6 +84,25 @@ contains
  
     end subroutine para_write_field_file_2d
 
+   
+    subroutine allmu_para_write_field_file_2d(boxfield,fileitem,muind,rootdata,pic2d)
+      class(pic_para_total2d_base), pointer, intent(in) :: pic2d      
+      real8, dimension(:,:,:), pointer, intent(in) :: boxfield
+      int4, intent(in) :: fileitem,muind
+      class(root_precompute_data), pointer, intent(in) :: rootdata
+      real8, dimension(:,:), pointer :: buff
+      int4 :: num1,num2
+
+      num1=size(boxfield,2)
+      num2=size(boxfield,3)
+      allocate(buff(num1,num2))
+      
+      buff=boxfield(muind,:,:)
+
+      call para_write_field_file_2d(buff,fileitem,rootdata,pic2d) 
+   
+      deallocate(buff)
+    end subroutine
 
     subroutine para_write_orbit_file_2d(tp_ful2d_head,numleft,numgr,fileitem,pic2d,iter_num)
       class(tp_ful2d_node), pointer,intent(in) :: tp_ful2d_head
