@@ -168,24 +168,24 @@ contains
        int4 :: i      
 !       pic2d%field2d%deng=pic2d%field2d%deng-pic2d%field2d%dengeq
        pic2d%field2d%dengeqtot(:,:)=0.0
-       pic2d%field2d%dengeqtot_e(:,:)=0.0
-       pic2d%field2d%dengeqtot_s(:,:)=0.0
-       pic2d%field2d%dengeqtot_w(:,:)=0.0
-       pic2d%field2d%dengeqtot_n(:,:)=0.0
-       pic2d%field2d%dengeqtot_ne(:,:)=0.0
-       pic2d%field2d%dengeqtot_se(:,:)=0.0
-       pic2d%field2d%dengeqtot_sw(:,:)=0.0
-       pic2d%field2d%dengeqtot_nw(:,:)=0.0       
+!       pic2d%field2d%dengeqtot_e(:,:)=0.0
+!       pic2d%field2d%dengeqtot_s(:,:)=0.0
+!       pic2d%field2d%dengeqtot_w(:,:)=0.0
+!       pic2d%field2d%dengeqtot_n(:,:)=0.0
+!       pic2d%field2d%dengeqtot_ne(:,:)=0.0
+!       pic2d%field2d%dengeqtot_se(:,:)=0.0
+!       pic2d%field2d%dengeqtot_sw(:,:)=0.0
+!       pic2d%field2d%dengeqtot_nw(:,:)=0.0       
        do i=1,pic2d%para2d%mu_num
          pic2d%field2d%dengeqtot=pic2d%field2d%dengeqtot+pic2d%field2d%deng(i,:,:)
-         pic2d%field2d%dengeqtot_e=pic2d%field2d%dengeqtot_e+pic2d%field2d%deng_e(i,:,:)
-         pic2d%field2d%dengeqtot_s=pic2d%field2d%dengeqtot_s+pic2d%field2d%deng_s(i,:,:)
-         pic2d%field2d%dengeqtot_w=pic2d%field2d%dengeqtot_w+pic2d%field2d%deng_w(i,:,:)
-         pic2d%field2d%dengeqtot_n=pic2d%field2d%dengeqtot_n+pic2d%field2d%deng_n(i,:,:)
-         pic2d%field2d%dengeqtot_ne=pic2d%field2d%dengeqtot_ne+pic2d%field2d%deng_ne(i,:,:)
-         pic2d%field2d%dengeqtot_se=pic2d%field2d%dengeqtot_se+pic2d%field2d%deng_se(i,:,:)
-         pic2d%field2d%dengeqtot_sw=pic2d%field2d%dengeqtot_sw+pic2d%field2d%deng_sw(i,:,:)
-         pic2d%field2d%dengeqtot_nw=pic2d%field2d%dengeqtot_nw+pic2d%field2d%deng_nw(i,:,:)
+!         pic2d%field2d%dengeqtot_e=pic2d%field2d%dengeqtot_e+pic2d%field2d%deng_e(i,:,:)
+!         pic2d%field2d%dengeqtot_s=pic2d%field2d%dengeqtot_s+pic2d%field2d%deng_s(i,:,:)
+!         pic2d%field2d%dengeqtot_w=pic2d%field2d%dengeqtot_w+pic2d%field2d%deng_w(i,:,:)
+!         pic2d%field2d%dengeqtot_n=pic2d%field2d%dengeqtot_n+pic2d%field2d%deng_n(i,:,:)
+!         pic2d%field2d%dengeqtot_ne=pic2d%field2d%dengeqtot_ne+pic2d%field2d%deng_ne(i,:,:)
+!         pic2d%field2d%dengeqtot_se=pic2d%field2d%dengeqtot_se+pic2d%field2d%deng_se(i,:,:)
+!         pic2d%field2d%dengeqtot_sw=pic2d%field2d%dengeqtot_sw+pic2d%field2d%deng_sw(i,:,:)
+!         pic2d%field2d%dengeqtot_nw=pic2d%field2d%dengeqtot_nw+pic2d%field2d%deng_nw(i,:,:)
        end do
  
 

@@ -11,7 +11,8 @@ use paradata_layout, only:    initialize_pic_para_total2d_base, &
                               allocate_memory_to_field_2d_gy,  &
                               allocate_memory_to_magfield_2d, &
                               initialize_parameters_2d,  &
-                              initialize_parameters_array_2d
+                              initialize_parameters_array_2d, &
+                              computing_mu_number
 
 use utilities_module, only: f_is_power_of_two, &
                             muarray_euler_maclaurin_choice
@@ -135,43 +136,44 @@ include "mpif.h"
     character(100) :: filepath_boris,filepath_gy,filepath_rk4,filepath1
 
 !!!! Test para_orbit
-   class(rk4ful2dnode), pointer :: partlist,partmp
-   class(pointin_node), pointer :: inlist, intmp
-   real8 :: f1(6), f2(6),f3(6),f4(6)
-   real8 :: elef(3), magf(3)
+    class(rk4ful2dnode), pointer :: partlist,partmp
+    class(pointin_node), pointer :: inlist, intmp
+    real8 :: f1(6), f2(6),f3(6),f4(6)
+    real8 :: elef(3), magf(3)
 !   int4 :: row,prank,size,numgr,rank
-   int4, dimension(:), pointer :: num,recnum
-   real8 :: vec(6),dt
-   int4 :: order,h,num_time
+    int4, dimension(:), pointer :: num,recnum
+    real8 :: vec(6),dt
+    int4 :: order,h,num_time
 
 !!! Test test_particles
-   class(tp_ful2d_node), pointer :: tpful2d_head,tpful2dtmp,tprk4ful2d_head,tprk4ful2dtmp
-   class(tp_gy2d_node),  pointer :: tpgy2d_head,tpgy2dtmp
-   class(tp_ful2dsend_node), dimension(:), pointer :: tpful2dsend_head,tpful2dsendtmp, &
+    class(tp_ful2d_node), pointer :: tpful2d_head,tpful2dtmp,tprk4ful2d_head,tprk4ful2dtmp
+    class(tp_gy2d_node),  pointer :: tpgy2d_head,tpgy2dtmp
+    class(tp_ful2dsend_node), dimension(:), pointer :: tpful2dsend_head,tpful2dsendtmp, &
                              tprk4ful2dsend_head, tprk4ful2dsendtmp
-   class(tp_gy2dsend_node), dimension(:), pointer :: tpgy2dsend_head,tpgy2dsendtmp
-   int4 :: numleft_rk4,numleft_boris,numleft_gy,numcircle,numgr,numgr_gy
-   character(25) :: pushkind
-   int4, dimension(:), pointer :: num_rk4,num_gy
-   real8 :: rho, theta,x2(2)
-   int4 :: rk4order,cell_per_unit(2)
-   int4 :: orbit_field=1
+    class(tp_gy2dsend_node), dimension(:), pointer :: tpgy2dsend_head,tpgy2dsendtmp
+    int4 :: numleft_rk4,numleft_boris,numleft_gy,numcircle,numgr,numgr_gy
+    character(25) :: pushkind
+    int4, dimension(:), pointer :: num_rk4,num_gy
+    real8 :: rho, theta,x2(2)
+    int4 :: rk4order,cell_per_unit(2)
+    int4 :: orbit_field=1
 
 !!!! integrated simulation
-   class(ful2d_node), pointer :: ful2d_head,ful2dtmp
+    class(ful2d_node), pointer :: ful2d_head,ful2dtmp
 !   class(gy2d_node),  pointer :: gy2d_head, gy2dtmp
 !   class(ful2dsend_node), dimension(:),pointer ::currk
 !   class(gy2dsend_node), pointer :: gy2dsend_head,gy2dsendtmp
-   class(gy2dmu_node), dimension(:), pointer :: gy2dmu_head 
-   int4 :: mu_num
-
+    class(gy2dmu_node), dimension(:), pointer :: gy2dmu_head, gy2dmutmp 
+    int4 :: mu_num,mutest
+    real8, dimension(:), pointer :: mu_nodes,mu_weights
+    int4, dimension(:), pointer :: munum_partition
+    real8 :: integ
 
 !!!! store density
    character(100) :: filepathgy,filepathful
    int4 :: fileitemful,fileitemgy
 
     allocate(weight(-1:2,-1:2))
-
     call MPI_INIT(IERR)
     call MPI_COMM_SIZE(MPI_COMM_WORLD,size,ierr)
     call MPI_COMM_RANK(MPI_COMM_WORLD,rank,ierr)
@@ -190,15 +192,17 @@ include "mpif.h"
     pic2d%para2d%geometry="cartesian"
     pic2d%para2d%mu=1.0
     pic2d%para2d%row=3
-    pic2d%para2d%cell_per_unit=(/10,10/) 
+    pic2d%para2d%cell_per_unit=(/30,30/) 
     pic2d%para2d%dtful=pic2d%para2d%dtgy/real(pic2d%para2d%num_time,8)
     pic2d%para2d%mu_scheme = 1
     !!! particle in cell part
-    pic2d%para2d%sigma = 2.0
+    pic2d%para2d%sigma = 25.0
     pic2d%para2d%tempt = 1.0
     pic2d%para2d%mumin=0.0_f64
     pic2d%para2d%mumax=20._F64
-    pic2d%para2d%mu_num=30
+    pic2d%para2d%mu_tail=1000
+    pic2d%para2d%mulast = 40
+!    pic2d%para2d%mu_num=39
     pic2d%para2d%gyroorder=1
     row=pic2d%para2d%row
     amp=0.02
@@ -216,7 +220,8 @@ include "mpif.h"
     pic2d%para2d%numproc=NINT(sqrt(real(size,8)))
     numproc=pic2d%para2d%numproc 
     comm=pic2d%layout2d%collective%comm
-    mu_num=pic2d%para2d%mu_num
+!    mu_num=pic2d%para2d%mu_num
+
 
 !    allocate(num_p(0:size-1),recnum(0:size-1))
 !    allocate(partlist,inlist) 
@@ -226,11 +231,19 @@ include "mpif.h"
 !    allocate(tprk4ful2dsend_head(0:size-1), tprk4ful2dsendtmp(0:size-1))
 !    allocate(tpgy2dsend_head(0:size-1), tpgy2dsendtmp(0:size-1))
 !    allocate(num_rk4(0:size-1),num_gy(0:size-1))
+
+
+    
+    allocate(mu_nodes(100),mu_weights(100),munum_partition(100))
+    munum_partition=0
+    call computing_mu_number(mu_nodes,mu_weights,munum_partition,mu_num, pic2d)
+    pic2d%para2d%mu_num=mu_num
+!   munum_partition=0
     allocate(ful2d_head)
-    allocate(gy2dmu_head(1:mu_num)) 
+    allocate(gy2dmu_head(1:mu_num),gy2dmutmp(1:mu_num)) 
  
     do i=1, mu_num
-      allocate(gy2dmu_head(i)%ptr)
+      allocate(gy2dmu_head(i)%ptr, gy2dmutmp(i)%ptr)
     end do
 !    num_p=0
 
@@ -257,13 +270,24 @@ include "mpif.h"
 
 !print*, "rank1=",rank
  
-
     global_sz(1)=pic2d%layout2d%global_sz1
     global_sz(2)=pic2d%layout2d%global_sz2
 
      pamearray=>allocate_parameters_array_2d(mu_num,global_sz(1:2))
+
    call initialize_parameters_2d(pic2d,pamearray) 
-   call initialize_parameters_array_2d(pic2d%para2d%mumax,mu_num,pic2d%para2d%mu_scheme,pamearray)  
+   call initialize_parameters_array_2d(pic2d%para2d%mumax,mu_num,pic2d%para2d%mu_scheme,pamearray, &
+        mu_nodes,mu_weights,munum_partition)  
+
+
+
+if(rank==0) then
+!print*, "mu_num=",mu_num, "mutest=",mutest
+print*, "munum_partition=",pamearray%munum_partition
+print*, "mu_num=",pic2d%para2d%mu_num
+print*, "mu_nodes=",pamearray%mu_nodes
+print*, "mu_weights=",pamearray%mu_weights
+end if
 
 if(rank==0) then
    print*, "gboxmin(:,1)",pic2d%para2d%gboxmin(:,1)
@@ -289,32 +313,54 @@ end if
   !!! prepare the inital distribution of particles
   call para_accprej_gaus1d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray)  
 
+!if(rank==0) then
+!print*, "munum_partion=",pamearray%munum_partition
+!print*, "mu_nodes=",pamearray%mu_nodes
+!print*, "mu_weights=",pamearray%mu_weights
+!end if
+
+!  do i=1,mu_num
+!     gy2dmutmp(1)%ptr=>gy2dmu_head(1)%ptr
+!     do while(associated(gy2dmutmp(1)%ptr))
+!        if(.not.associated(gy2dmutmp(1)%ptr%next)) then
+!           exit
+!        else 
+!           print*, gy2dmutmp(1)%ptr%coords(1:3)
+!           gy2dmutmp(1)%ptr=>gy2dmutmp(1)%ptr%next
+!        end if
+!      end do
+!  end do
+  
 !print*, 2
 ! !!! and store the equilibrium distirbution on the mesh
-!  call partition_density_to_grid_ful(ful2d_head,pic2d)
-!  call compute_equdensity_for_ful(pic2d)
-!print*, 3
-! !!! and store the equilibrium distirbution on the mesh
-!  call partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d)
-!  call compute_equdensity_for_gy(pic2d)
-!print*, 4
-!     filepathgy="/home/qmlu/zsx163/parallel_full_gyro/run/orbit/densgy"
-!     filepathful="/home/qmlu/zsx163/parallel_full_gyro/run/orbit/densful"
-!
-!     fileitemful=10
-!     fileitemgy =20
-!
-!     call open_file(fileitemful,filepathful,rank)
-!     call open_file(fileitemgy,filepathgy,rank)  
-!   
-!     call para_write_field_file_2d(pic2d%field2d%denfeq,fileitemful,rootdata,pic2d)
-! 
-!     call para_write_field_file_2d(pic2d%field2d%dengeqtot,fileitemgy,rootdata,pic2d)
-!  
-!     call close_file(fileitemful,rank)
-!     call close_file(fileitemgy, rank)
+  call partition_density_to_grid_ful(ful2d_head,pic2d)
+  call compute_equdensity_for_ful(pic2d)
+print*, 3
+ !!! and store the equilibrium distirbution on the mesh
+  call partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d)
+!if(rank==0) then
+!   print*, "pic2d%deng=",pic2d%field2d%deng(3,:,:)
+!end if
 
-!     deallocate(pic2d,pamearray)
+  call compute_equdensity_for_gy(pic2d)
+
+     filepathgy="/home/qmlu/zsx163/parallel_full_gyro/run/orbit/densgy.txt"
+     filepathful="/home/qmlu/zsx163/parallel_full_gyro/run/orbit/densful.txt"
+
+     fileitemful=10
+     fileitemgy =20
+
+     call open_file(fileitemful,filepathful,rank)
+     call open_file(fileitemgy,filepathgy,rank)  
+   
+     call para_write_field_file_2d(pic2d%field2d%denfeq,fileitemful,rootdata,pic2d)
+ 
+     call para_write_field_file_2d(pic2d%field2d%dengeqtot,fileitemgy,rootdata,pic2d)
+  
+     call close_file(fileitemful,rank)
+     call close_file(fileitemgy, rank)
+
+     deallocate(pic2d)
      call MPI_FINALIZE(IERR) 
   end program  test_para_random_sample
 

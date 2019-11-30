@@ -152,7 +152,7 @@ contains
     xmin(2)=pic2d%para2d%m_x2%eta_min
   
     do i=1,mu_num
-       if(.not.associated(gy2dmutmp(i)%ptr)) then
+      if(.not.associated(gy2dmu_head(i)%ptr)) then
          print*, "error: the particles are not stored in gy2dmutmp(i)%ptr)"
          stop
        end if
@@ -928,7 +928,9 @@ contains
        rankcur(i)%ptr=>gy2dsend_head(i)%ptr
     end do    
     allocate(coordcur(1:mu_num))
-    coordcur(muind)%ptr=>gy2dmu_head(muind)%ptr
+    do i=1, mu_num
+      coordcur(i)%ptr=>gy2dmu_head(i)%ptr
+    end do
     allocate(rcounts(0:size-1),scounts(0:size-1),sdispls(0:size-1),rdispls(0:size-1),rbuf0(0:size-1))
     call mpi_alltoall(num,1,mpi_integer,rbuf0,1,mpi_integer,comm,ierr)
     call prep_for_mpi_alltoallv_with_zeroinput(rank,size,numgr,num,rbuf0,scounts, &
@@ -987,11 +989,18 @@ contains
    if(numout==0) then
      goto 20
    else
+!print*, "rank=",rank,numout
      do i=0,numout-1
-        coordcur(muind)%ptr%coords(1:3)=rbuf(4*i:4*i+2)
-        allocate(coordcur(muind)%ptr%next)
-        coordcur(muind)%ptr=>coordcur(muind)%ptr%next
+        coordcur(muind)%ptr%coords(1:3)=rbuf(numgr*i:numgr*i+2)
+        allocate(coordcur(muind)%ptr%next,stat=ierr)
+!        call gp_error(ierr,"coordur")
+        if(ierr.ne.0) then
+           print*, "#error: coordcur is not allocated"
+           stop
+        endif
+       coordcur(muind)%ptr=>coordcur(muind)%ptr%next
      end do
+
 20   end if
 
    deallocate(rankcur)

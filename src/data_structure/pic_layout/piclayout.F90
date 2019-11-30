@@ -41,6 +41,8 @@ module piclayout
      int4  :: mu_num
      real8 :: mumin,mumax
      int4 :: mu_scheme
+     int4 :: mu_tail    !! The number of particles located at the last mu number 
+     real8 :: mulast    !! The number of the last mu number which is accepted.
      real8 :: tempt
 
      int4  :: row   !!! left,right,up,down, the number of lines for the communication for interpolation
@@ -57,6 +59,7 @@ module piclayout
   type parameters_array_2d
      real8, dimension(:),pointer :: mu_nodes,mu_weights
      real8, dimension(:,:),pointer :: temp_i,temp_e
+     int4, dimension(:), pointer :: munum_partition
   end type parameters_array_2d
 !!                    north
 !!              nn*************ee

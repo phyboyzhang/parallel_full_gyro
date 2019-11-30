@@ -14,7 +14,8 @@ public::  initialize_pic_para_2d_base, &
           allocate_memory_to_field_2d_gy,  &
           allocate_memory_to_magfield_2d,  &
           allocate_parameters_array_2d,  &
-          initialize_parameters_array_2d
+          initialize_parameters_array_2d, &
+          computing_mu_number
 contains
 
   function initialize_pic_para_2d_base(size)   result(pic2d)
@@ -64,6 +65,7 @@ contains
      allocate(pamearray%temp_e(global_sz(1),global_sz(2)))
      allocate(pamearray%mu_nodes(mu_num))
      allocate(pamearray%mu_weights(mu_num))
+     allocate(pamearray%munum_partition(mu_num))
 
   end function allocate_parameters_array_2d
 
@@ -206,7 +208,8 @@ contains
        rank=pic2d%layout2d%collective%rank
 
        do i=1,2
-         delta(i)=1._f64/real(pic2d%para2d%cell_per_unit(i),8)
+         delta(i)=(pic2d%para2d%gxmax(i)-pic2d%para2d%gxmin(i))/  &
+                  real(pic2d%para2d%numproc(i)*pic2d%para2d%cell_per_unit(i),8)
        end do
 
 !       allocate(pic2d%para2d%gboxmin(0:size-1,2),pic2d%para2d%gboxmax(0:size-1,2))
@@ -250,14 +253,76 @@ contains
    end subroutine initialize_parameters_2d
 
 
-   subroutine initialize_parameters_array_2d(mumax,mu_num,mu_scheme,pamearray)
+   subroutine initialize_parameters_array_2d(mumax,mu_num,mu_scheme,pamearray,mu_nodes,mu_weights,munum_partition)
      class(parameters_array_2d), pointer :: pamearray
-     real8 :: mumax
-     int4  :: mu_num,mu_scheme
+     real8,intent(in) :: mumax
+     int4,intent(in)  :: mu_num,mu_scheme
+     real8, dimension(:), pointer, intent(in) :: mu_nodes,mu_weights
+     int4, dimension(:), pointer,intent(in) :: munum_partition
+        
+!     allocate(mu_nodes(mu_num+1),mu_weights(mu_num+1))
+!     call muarray_euler_maclaurin_choice(mumax,mu_num+1,  &
+!                                         mu_nodes,mu_weights,mu_scheme)
+     
 
-     call muarray_euler_maclaurin_choice(mumax,mu_num,  &
-                                       pamearray%mu_nodes,pamearray%mu_weights,mu_scheme)
- 
+     pamearray%mu_nodes(1:mu_num)=mu_nodes(1:mu_num)
+     pamearray%mu_weights(1:mu_num)=mu_weights(1:mu_num)
+     pamearray%munum_partition(1:mu_num)=munum_partition(1:mu_num)
+ !    deallocate(mu_nodes,mu_weights) 
    end subroutine
+
+   subroutine computing_mu_number(mu_nods,mu_weigs,munum_part,mu_num,pic2d)
+     class(pic_para_total2d_base), pointer :: pic2d
+     real8, dimension(:), pointer,intent(inout) :: mu_nods,mu_weigs
+     int4, dimension(:), pointer, intent(inout) :: munum_part
+     int4, intent(inout) :: mu_num
+     int4 :: mutest
+     real8, dimension(:), pointer :: mu_nodes,mu_weights   
+     int4, dimension(:), pointer :: munum_partition 
+     real8 :: integ
+     int4 :: i    
+ 
+     mutest=pic2d%para2d%mulast
+     allocate(mu_nodes(mutest),mu_weights(mutest),munum_partition(mutest))
+     munum_partition=0
+     do while(munum_partition(pic2d%para2d%mulast).le.pic2d%para2d%mu_tail)
+       deallocate(mu_nodes,mu_weights,munum_partition)
+       mutest=mutest+5
+       print*, mutest
+       if(mutest.ge.100) then
+         print*, "#error: the numer of munodes exceeds the given upbound."
+         stop
+       end if
+       allocate(mu_nodes(mutest),mu_weights(mutest),munum_partition(mutest))
+       call muarray_euler_maclaurin_choice(pic2d%para2d%mumax,mutest,  &
+                                         mu_nodes,mu_weights,pic2d%para2d%mu_scheme)
+       integ=0.0
+       do i=1,mutest
+         integ=integ+exp(-mu_nodes(i)/pic2d%para2d%tempt)*mu_weights(i)
+       end do
+
+       do i=1,mutest
+          munum_partition(i)=NINT(real(pic2d%para2d%numparticle,8)*exp(-mu_nodes(i)/ &
+             pic2d%para2d%tempt)*mu_weights(i)/integ)
+       end do
+     end do
+
+     mu_num=pic2d%para2d%mulast
+     do while(mu_num.le.mutest)
+       if(munum_partition(mu_num+1).ge.1000) then
+         mu_num=mu_num+1
+       else
+         exit
+       end if
+     end do
+     
+     mu_num=mu_num-1   !!! Because the first elements of mu_ndoes and mu_weights equal zero.
+     mu_nods(1:mu_num)=mu_nodes(2:mu_num+1)
+     mu_weigs(1:mu_num)=mu_weights(2:mu_num+1)
+     munum_part(1:mu_num)=munum_partition(2:mu_num+1)
+!     pic2d%para2d%mu_num=mu_num
+
+     deallocate(mu_nodes,mu_weights,munum_partition)
+  end subroutine computing_mu_number
 
 end module paradata_layout
