@@ -1,5 +1,6 @@
 Program test_para_gyroaverage
 #include "work_precision.h"
+use constants, only: pi_
 use cartesian_mesh,   only: cartesian_mesh_1d, &
                             init_para_cartesian_mesh_1d
 use paradata_type, only: pic_para_2d_base, &
@@ -37,6 +38,7 @@ use para_gyroaverage_2d_one,only: sort_quadraturepoint_among_process, &
                                   para_compute_gyroaverage_stiff_matrix, &
                                   store_data_on_rootprocess
 use gyroaverage_2d_base, only: gyropoint_node
+use m_fieldsolver, only: solve_weight_of_field_among_processes
 
 implicit none
 include "mpif.h"
@@ -63,7 +65,8 @@ include "mpif.h"
 
     real8 :: mu
     class(gyropoint_node), dimension(:),pointer :: pointhead
-
+    int4 :: cell_per_unit(2)
+ 
     allocate(weight(-1:2,-1:2))
 
     call MPI_INIT(IERR)
@@ -82,7 +85,7 @@ include "mpif.h"
     pic2d=> initialize_pic_para_total2d_base(size)
 !!! initialize parameter_2d_sets
     pic2d%para2d%gxmin=(/0.0,0.0/)
-    pic2d%para2d%gxmax=(/3.0,3.0/)
+    pic2d%para2d%gxmax=(/2.0*pi_,2.0*pi_/)
     pic2d%para2d%N_points=3
     pic2d%para2d%iter_number=20000
     pic2d%para2d%dtgy=0.5
@@ -91,12 +94,8 @@ include "mpif.h"
     pic2d%para2d%geometry="cartesian"
     pic2d%para2d%mu=0.2
     pic2d%para2d%row=3
-    pic2d%para2d%cell_per_unit=(/2,2/) 
+    pic2d%para2d%cell_per_unit=(/10,10/) 
     row=pic2d%para2d%row
-
-    do i=1,2
-       delta(i)=1._f64/real(pic2d%para2d%cell_per_unit(i),8)
-    end do
 
     !!! initialize layout2d      
     pic2d%layout2d%collective%rank=rank
@@ -105,9 +104,14 @@ include "mpif.h"
     pic2d%para2d%numproc=NINT(sqrt(real(size,8)))
     numproc=pic2d%para2d%numproc 
     comm=pic2d%layout2d%collective%comm
+    cell_per_unit=pic2d%para2d%cell_per_unit   
  
     do i=1,2
-       global_sz(i)=pic2d%para2d%cell_per_unit(i)*(pic2d%para2d%gxmax(i)-pic2d%para2d%gxmin(i))+1
+       delta(i)=pic2d%para2d%gxmax(i)/real(cell_per_unit(i)*numproc(i),8)
+    end do
+
+    do i=1,2
+       global_sz(i)=pic2d%para2d%cell_per_unit(i)*numproc(i)+1
     end do
 
     call initialize_layout_with_distributed_2d_array( &
@@ -122,6 +126,7 @@ include "mpif.h"
          print*, "size,boxes(i),",i,pic2d%layout2d%boxes(i)
        enddo  
     end if 
+
 !    allocate(pic2d%para2d%gboxmin(0:size-1,2),pic2d%para2d%gboxmax(0:size-1,2))
   do i=0,pic2d%para2d%numproc(2)-1      
     do j=0,pic2d%para2d%numproc(1)-1
@@ -203,8 +208,9 @@ end if
 !         pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)
 
      rootdata=>initialize_rootdata_structure(pic2d%layout2d%global_sz1*pic2d%layout2d%global_sz2)
-!    call gather_field_to_rootprocess_per_per(rootdata%field,pic2d%field2d%ep,rank,size,boxindex,&
-!          pic2d%para2d%numproc,pic2d%layout2d) 
+
+    call gather_field_to_rootprocess_per_per(rootdata%field,pic2d%field2d%ep,rank,size,boxindex,&
+          pic2d%para2d%numproc,pic2d%layout2d) 
 
 !    if(rank==0) then
 !       print*, 'rootfield=', rootdata%field
@@ -219,24 +225,30 @@ end if
 !    endif
 
 
-!  if(rank==0) then
-!    call compute_D_spl2D_per_per_noblock( &
-!         pic2d%layout2d%global_sz1, &
-!         pic2d%layout2d%global_sz2, &
-!         rootdata%ASPL)
-!  end if
+  if(rank==0) then
+    call compute_D_spl2D_per_per_noblock( &
+         pic2d%layout2d%global_sz1, &
+         pic2d%layout2d%global_sz2, &
+         rootdata%ASPL)
+  end if
+
+  call solve_weight_of_field_among_processes(pic2d%field2d%ep,rootdata%ASPL,rootdata,pic2d, &
+       pic2d%field2d%ep_weight, pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n, &
+       pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
+       pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
+
 !  call para_compute_spl2D_weight(rootdata%ASPL,rootdata%field,pic2d%field2d%ep_weight, &
 !       pic2d%para2d%numproc,pic2d%layout2d,pic2d%para2d%boundary)
 !
-
-
-!   print*, "rank=",rank,pic2d%field2d%ep_weight
- 
+!
+!
+!!   print*, "rank=",rank,pic2d%field2d%ep_weight
+! 
 !   call get_layout_2d_box_index(pic2d%layout2d,rank,boxindex)
 !    call mpi2d_alltoallv_box_per_per(row,comm,rank,numproc,pic2d%field2d%ep_weight,pic2d%field2d%epwg_w, &
 !       pic2d%field2d%epwg_e,pic2d%field2d%epwg_n,pic2d%field2d%epwg_s,pic2d%field2d%epwg_sw, &
 !       pic2d%field2d%epwg_se,pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne,boxindex)       
-!
+
 ! if(rank==rankone) then
 !!     print*, "rankone=",rank
 !!     print*, pic2d%para2d%m_x1%eta_min,pic2d%para2d%m_x1%eta_max
@@ -265,25 +277,26 @@ end if
 !
 ! call mpi_barrier(comm)
 
-!  num_p=0
+  num_p=0
 ! if(rank==2) then
-!  call sort_quadraturepoint_among_process(pic2d%para2d%mu,rank,pointhead,num_p,pic2d%para2d%N_points, & 
-!          pic2d)
-!  do i=0, size-1
-!     print*, "rank=",rank,"i=",i,"num_p(i)=",num_p(i)
-!  end do
-! end if
+  call sort_quadraturepoint_among_process(pic2d%para2d%mu,rank,pointhead,num_p,pic2d%para2d%N_points, & 
+          pic2d)
+if(rank==0) then
+  do i=0, size-1
+     print*, "rank=",rank,"i=",i,"num_p(i)=",num_p(i)
+  end do
+ end if
 
 !num_p=0
 !if(rank==0) then
-!  call para_compute_gyroaverage_stiff_matrix(pointhead,num_p,pic2d%para2d%mu,1,pic2d%para2d%N_points,pic2d,rootdata)
+  call para_compute_gyroaverage_stiff_matrix(pointhead,num_p,pic2d%para2d%mu,1,pic2d%para2d%N_points,pic2d,rootdata)
 !end if
 !if(rank==0) then
 !
 !print*, "acontri=",rootdata%acontri
 !end if
 
-  call store_data_on_rootprocess(pic2d%para2d%mu,1,rank,rootdata,pic2d)
+!  call store_data_on_rootprocess(pic2d%para2d%mu,1,rank,rootdata,pic2d)
 
 
     call MPI_FINALIZE(IERR) 

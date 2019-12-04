@@ -158,8 +158,9 @@ contains
          pic2d%field2d%epgywg_nw(i,:,:)=rnw
          pic2d%field2d%epgywg_ne(i,:,:)=rne
        
-       end do    
-
+       end do   
+   
+       deallocate(buf,box,rw,re,rn,rs,rsw,rse,rnw,rne)
      end subroutine solve_gyfieldweight_from_fulfield
 
 

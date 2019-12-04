@@ -282,28 +282,6 @@ contains
 !      print*, "gy2d_head is not allocated"
 !      stop
 !    end if
-!    call random_seed()       
-!  integ=0.0
-!  do i=1,mu_num
-!    integ=integ+exp(-pamearray%mu_nodes(i)/tempt)*pamearray%mu_weights(i)
-!  end do
-! 
-!  do i=1,mu_num
-!    pamearray%munum_partition(i)=NINT(real(pic2d%para2d%numparticle,8)*exp(-pamearray%mu_nodes(i)/ &
-!             tempt)*pamearray%mu_weights(i)/integ)
-!  end do
-!
-!  do i=1,mu_num
-!     sum=sum+pamearray%munum_partition(i)
-!  end do
-!
-!if(rank==0) then
-!print*, sum
-!print*, "munum_partition=",pamearray%munum_partition
-!print*, "integ=",integ
-!print*, "mu_nodes=",pamearray%mu_nodes
-!print*, "mu_weights=",pamearray%mu_weights
-!end if
 
   do j=1,mu_num    
     num_gy=0

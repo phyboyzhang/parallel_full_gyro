@@ -6,7 +6,7 @@ ADD_EXECUTABLE(test_para_random_sample test_para_random_sample.F90)
 Target_link_libraries(test_para_random_sample para_random_sample moveparticles
                       orbit picutilities meshes interpolation
                       parautilities piclayout mpilayout gyroaverage precompute outputdata constants
-                      field_test fieldsolver paradata_layout paradata_type)
+                      field_test fieldsolver paradata_layout paradata_type diagnosis)
 
 ADD_EXECUTABLE(random_sample_2d random_sample_2d.F90)
 

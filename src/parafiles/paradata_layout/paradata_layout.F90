@@ -288,7 +288,7 @@ contains
      do while(munum_partition(pic2d%para2d%mulast).le.pic2d%para2d%mu_tail)
        deallocate(mu_nodes,mu_weights,munum_partition)
        mutest=mutest+5
-       print*, mutest
+  !     print*, mutest
        if(mutest.ge.100) then
          print*, "#error: the numer of munodes exceeds the given upbound."
          stop

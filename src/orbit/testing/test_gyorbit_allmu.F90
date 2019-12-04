@@ -1,4 +1,4 @@
-Program test_para_random_sample
+Program test_gyorbit_allmu
 #include "work_precision.h"
 use constants, only: pi_
 use cartesian_mesh,   only: cartesian_mesh_1d, &
@@ -96,7 +96,6 @@ use m_tp_para_orbit, only: tp_push_ful_orbit, &
 use m_precompute, only: precompute_ASPL, &
                         precompute_doublegyroaverage_matrix
 use piclayout, only: ful2d_node,gy2d_node,gy2dmu_node
-use diagnosis2D, only: compare_density_to_initnumber_gy
 
 implicit none
 include "mpif.h"
@@ -117,7 +116,6 @@ include "mpif.h"
     int4 :: ierr
     real8, dimension(:,:), pointer :: weight
     real8 :: deri_firstorder(2)
-
 
 !!!!! gyroaverage
 
@@ -185,16 +183,16 @@ include "mpif.h"
     pic2d%para2d%gxmin=(/0.0,0.0/)
     pic2d%para2d%gxmax=(/2.0*pi_,2.0*pi_/)
     pic2d%para2d%N_points=50
-    pic2d%para2d%iter_number=100
+    pic2d%para2d%iter_number=10
     pic2d%para2d%numcircle=8
-    pic2d%para2d%numparticle=200000
+    pic2d%para2d%numparticle=300000
     pic2d%para2d%dtgy=1.0
     pic2d%para2d%num_time=15
     pic2d%para2d%boundary="double_per"
     pic2d%para2d%geometry="cartesian"
-    pic2d%para2d%mu=1.0
+ !   pic2d%para2d%mu=1.0
     pic2d%para2d%row=3
-    pic2d%para2d%cell_per_unit=(/30,30/) 
+    pic2d%para2d%cell_per_unit=(/10,10/) 
     pic2d%para2d%dtful=pic2d%para2d%dtgy/real(pic2d%para2d%num_time,8)
     pic2d%para2d%mu_scheme = 1
     !!! particle in cell part
@@ -315,62 +313,91 @@ end if
     boxindex(2)=pic2d%layout2d%boxes(rank)%i_max
     boxindex(3)=pic2d%layout2d%boxes(rank)%j_min
     boxindex(4)=pic2d%layout2d%boxes(rank)%j_max 
+
+ !!! prepare the initial field
+  dimsize=dimsize_of_rank_per_per(rank,pic2d%para2d%numproc,pic2d%layout2d)
+
+  if(orbit_field==0) then
+  do i=1,dimsize(1)
+    do j=1, dimsize(2)
+       globalind=globalind_from_localind_2d((/i,j/),pic2d%para2d%numproc,rank,pic2d%layout2d,pic2d%para2d%boundary)
+       pic2d%field2d%ep(i,j)=real(globalind(2),8)*0.1    !real(globalind(1)+globalind(2), 8)
+       pic2d%field2d%Bf03(i,j)=1.0
+    end do
+  end do
+  else
+    call para_initialize_field_2d_mesh(amp,amp_eq,wave_one,wave_two, pic2d)
+  endif
     
   !!! prepare the inital distribution of particles
   call para_accprej_gaus1d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray)  
 
-!if(rank==0) then
-!print*, "munum_partion=",pamearray%munum_partition
-!print*, "mu_nodes=",pamearray%mu_nodes
-!print*, "mu_weights=",pamearray%mu_weights
-!end if
+if(rank==0) then
+print*, "#samping particles is finished."
+end if
 
-!  do i=1,mu_num
-!     gy2dmutmp(1)%ptr=>gy2dmu_head(1)%ptr
-!     do while(associated(gy2dmutmp(1)%ptr))
-!        if(.not.associated(gy2dmutmp(1)%ptr%next)) then
-!           exit
-!        else 
-!           print*, gy2dmutmp(1)%ptr%coords(1:3)
-!           gy2dmutmp(1)%ptr=>gy2dmutmp(1)%ptr%next
-!        end if
-!      end do
-!  end do
-  
+
+ !!! precomputing
+  call precompute_ASPL(rank,global_sz,rootdata%ASPL)
+if(rank==0) then
+print*, "precomputing ASPL is finished."
+endif
+
+  call precompute_doublegyroaverage_matrix(rootdata,pic2d,pamearray)
+!if(rank==0) then
+!print*, "precomputing is finished."
+!endif
+!  call solve_weight_of_field_among_processes(pic2d%field2d%Bf03,rootdata%ASPL,rootdata,pic2d, &
+!       pic2d%field2d%bf03wg,pic2d%field2d%BF03wg_w,pic2d%field2d%bf03wg_e,pic2d%field2d%bf03wg_n, &
+!       pic2d%field2d%bf03wg_s, pic2d%field2d%bf03wg_sw,pic2d%field2d%bf03wg_se, &
+!       pic2d%field2d%bf03wg_nw,pic2d%field2d%bf03wg_ne)
+!
+!    call solve_gyfieldweight_from_fulfield(rootdata,pic2d,pamearray)
+!
+!    call gyrork4solveallmu(gy2dmu_head,pic2d,pic2d%para2d%iter_number)
+
+
+!  do i=1,pic2d%para2d%iter_number
+!    if(rank==0) then
+!      print*, "#iter_number=", i
+!    endif
+!    !!! and store the equilibrium distirbution on the mesh
+!    call solve_gyfieldweight_from_fulfield(rootdata,pic2d,pamearray)
+!print*, 1
+!    call gyrork4solveallmu(gy2dmu_head,pic2d,pic2d%para2d%iter_number)
 !print*, 2
-! !!! and store the equilibrium distirbution on the mesh
-  call partition_density_to_grid_ful(ful2d_head,pic2d)
-  call compute_equdensity_for_ful(pic2d)
-  call compare_density_to_initnumber_gy(pic2d%field2d%denfeq, pic2d)
-
-
-!print*, 3
+!    call partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d)
+!!    pic2d%field2d%deng=pic2d%field2d%deng-pic2d%field2d%dengeq
+!    call compute_gyrodensity_perturbation(rootdata,pic2d,pamearray)
+!print*,3
+!    call solve_field_quasi_neutral(rank,rootdata,pic2d,pamearray)  !!! solve the electrostatic potential
+!
+!!    call diagnoize
+!     do j=1,pic2d%para2d%num_time
+!       if(rank==0) then
+!         print*, "#j=",j
+!       endif
+!       call solve_weight_of_field_among_processes(pic2d%field2d%ep,rootdata%ASPL,rootdata,pic2d, &
+!       pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n,&
+!       pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
+!       pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
+!
+!       call borissolve(ful2d_head,pic2d,(i-1)*pic2d%para2d%num_time+j)
+!
+!       call partition_density_to_grid_ful(ful2d_head,pic2d)
+!
+!       pic2d%field2d%denf=pic2d%field2d%denf-pic2d%field2d%denfeq
+!       call solve_field_ful(rootdata,pic2d,pamearray)
+!
+!
+!!       call diagnoize ????
+!    end do
+!
+!  end do
+!print*, rank
+    deallocate(pic2d,pamearray,rootdata)
+    deallocate(ful2d_head,gy2dmu_head,gy2dmutmp)
  !!! and store the equilibrium distirbution on the mesh
-  call partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d)
-!if(rank==0) then
-!   print*, "pic2d%deng=",pic2d%field2d%deng(3,:,:)
-!end if
-
-  call compute_equdensity_for_gy(pic2d)
-  call compare_density_to_initnumber_gy(pic2d%field2d%dengeqtot, pic2d)
-
-     filepathgy="/home/qmlu/zsx163/parallel_full_gyro/run/orbit/densgy.txt"
-     filepathful="/home/qmlu/zsx163/parallel_full_gyro/run/orbit/densful.txt"
-
-     fileitemful=10
-     fileitemgy =20
-
-     call open_file(fileitemful,filepathful,rank)
-     call open_file(fileitemgy,filepathgy,rank)  
-   
-     call para_write_field_file_2d(pic2d%field2d%denfeq,fileitemful,rootdata,pic2d)
- 
-     call para_write_field_file_2d(pic2d%field2d%dengeqtot,fileitemgy,rootdata,pic2d)
-  
-     call close_file(fileitemful,rank)
-     call close_file(fileitemgy, rank)
-
-     deallocate(pic2d)
-     call MPI_FINALIZE(IERR) 
-  end program  test_para_random_sample
+    call MPI_FINALIZE(IERR) 
+  end program test_gyorbit_allmu
 

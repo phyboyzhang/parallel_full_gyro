@@ -52,44 +52,56 @@ contains
       boxindex(3)=pic2d%layout2d%boxes(rank)%j_min
       boxindex(4)=pic2d%layout2d%boxes(rank)%j_min
       allocate(density(numdim),stat=ierr)
-      allocate(buf(boxindex(2)-boxindex(1)+1,boxindex(4)-boxindex(3)+1))
+!      allocate(buf(boxindex(2)-boxindex(1)+1,boxindex(4)-boxindex(3)+1))
 
 !      buf= pic2d%field2d%den-pic2d%field2d%denequ
       call gather_field_to_rootprocess_per_per(density,pic2d%field2d%dengeqtot,rank, &
            size,boxindex,pic2d%para2d%numproc,pic2d%layout2d)
-
-      if(rank==0) then
+     if(rank==0) then
         allocate(buf1(numdim,numdim),buf2(numdim,numdim))
-      end if
+        buf2=0.0
+     end if
       do j=1,mu_num
          mu=pamearray%mu_nodes(j)
-         buf1=0.0
-         rootdata%ACONTRI=0.0
+         if(rank==0) then     
+           buf1=0.0
+         end if
+if(rank==0) then
+print*, "j=",j
+end if
          call store_data_on_rootprocess(mu,j,rank,rootdata,pic2d)
+
          if(rank==0) then
            buf1=matmul(rootdata%ACONTRI,rootdata%ASPL)
+
            do i=1, numdim
              buf1(i,:)=buf1(i,:)*density(i)   ! ????
            end do
            buf1=matmul(rootdata%ASPL,buf1)
            buf2=buf2+matmul(rootdata%ACONTRI,buf1)*pamearray%mu_weights(j)
+
          endif
       end do
-      do i=1,numdim
-        num1 = modulo(numdim,pic2d%layout2d%global_sz1)
-        num2 = (numdim-num1)/pic2d%layout2d%global_sz1+1
-        buf2(i,i)=buf2(i,i)+1.0_f64/pamearray%temp_i(num1,num2)+1.0_f64/pamearray%temp_e(num1,num2)
-      end do
 
+    if(rank==0) then
+     do i=1,numdim
+      num1 = modulo(i,pic2d%layout2d%global_sz1)
+      num2 = (i-num1)/pic2d%layout2d%global_sz1+1 
+       buf2(i,i)=buf2(i,i)+1.0_f64/pamearray%temp_i(num1,num2)+1.0_f64/pamearray%temp_e(num1,num2)
+      end do
       LDA= numdim
+      LWORK = numdim+15
       allocate(IPIV(NUMDIM))
       allocate(work(NUMDIM))
       call dgetrf(numdim,numdim,buf2,LDA,IPIV,INFO)
       call dgetri(numdim,buf2,LDA,IPIV,WORK,LWORK,INFO)
 
       rootdata%prematrix=buf2
+    
+      
+      deallocate(buf1,buf2)
+      endif       
 
-      deallocate(buf1,buf2,IPIV, work)
-   end subroutine precompute_doublegyroaverage_matrix
+     end subroutine precompute_doublegyroaverage_matrix
 
 end module m_precompute
