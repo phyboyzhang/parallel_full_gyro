@@ -1,0 +1,3 @@
+ADD_EXECUTABLE(test_euler_maclaurin test_euler_maclaurin.F90)
+
+Target_Link_Libraries(test_euler_maclaurin utilities)
