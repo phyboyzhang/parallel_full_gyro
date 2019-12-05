@@ -344,17 +344,17 @@ print*, "precomputing ASPL is finished."
 endif
 
   call precompute_doublegyroaverage_matrix(rootdata,pic2d,pamearray)
-!if(rank==0) then
-!print*, "precomputing is finished."
-!endif
-!  call solve_weight_of_field_among_processes(pic2d%field2d%Bf03,rootdata%ASPL,rootdata,pic2d, &
-!       pic2d%field2d%bf03wg,pic2d%field2d%BF03wg_w,pic2d%field2d%bf03wg_e,pic2d%field2d%bf03wg_n, &
-!       pic2d%field2d%bf03wg_s, pic2d%field2d%bf03wg_sw,pic2d%field2d%bf03wg_se, &
-!       pic2d%field2d%bf03wg_nw,pic2d%field2d%bf03wg_ne)
-!
-!    call solve_gyfieldweight_from_fulfield(rootdata,pic2d,pamearray)
-!
-!    call gyrork4solveallmu(gy2dmu_head,pic2d,pic2d%para2d%iter_number)
+if(rank==0) then
+print*, "precomputing is finished."
+endif
+  call solve_weight_of_field_among_processes(pic2d%field2d%Bf03,rootdata,pic2d, &
+       pic2d%field2d%bf03wg,pic2d%field2d%BF03wg_w,pic2d%field2d%bf03wg_e,pic2d%field2d%bf03wg_n, &
+       pic2d%field2d%bf03wg_s, pic2d%field2d%bf03wg_sw,pic2d%field2d%bf03wg_se, &
+       pic2d%field2d%bf03wg_nw,pic2d%field2d%bf03wg_ne)
+
+    call solve_gyfieldweight_from_fulfield(rootdata,pic2d,pamearray)
+
+    call gyrork4solveallmu(gy2dmu_head,pic2d,pic2d%para2d%iter_number)
 
 
 !  do i=1,pic2d%para2d%iter_number

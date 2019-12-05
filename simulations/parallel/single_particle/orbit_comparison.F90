@@ -322,12 +322,12 @@ call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
          pic2d%layout2d%global_sz2, &
          rootdata%ASPL)
    end if
-  call solve_weight_of_field_among_processes(pic2d%field2d%ep,rootdata%ASPL,rootdata,pic2d, &
+  call solve_weight_of_field_among_processes(pic2d%field2d%ep,rootdata,pic2d, &
        pic2d%field2d%ep_weight, pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n, &
        pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
        pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
  
-  call solve_weight_of_field_among_processes(pic2d%field2d%gep,rootdata%ASPL,rootdata,pic2d, &
+  call solve_weight_of_field_among_processes(pic2d%field2d%gep,rootdata,pic2d, &
        pic2d%field2d%gep_weight, pic2d%field2d%gepwg_w,pic2d%field2d%gepwg_e,pic2d%field2d%gepwg_n, &
        pic2d%field2d%gepwg_s, pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se, &
        pic2d%field2d%gepwg_nw,pic2d%field2d%gepwg_ne)
@@ -337,7 +337,7 @@ call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
   
   call solve_gyfieldweight_from_fulfield(rootdata,pic2d,pamearray)
 
-  call solve_weight_of_field_among_processes(pic2d%field2d%Bf03,rootdata%ASPL,rootdata,pic2d, &
+  call solve_weight_of_field_among_processes(pic2d%field2d%Bf03,rootdata,pic2d, &
        pic2d%field2d%bf03wg, pic2d%field2d%BF03wg_w,pic2d%field2d%bf03wg_e,pic2d%field2d%bf03wg_n, &
        pic2d%field2d%bf03wg_s, pic2d%field2d%bf03wg_sw,pic2d%field2d%bf03wg_se, &
        pic2d%field2d%bf03wg_nw,pic2d%field2d%bf03wg_ne)
@@ -504,7 +504,7 @@ call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
 
 rk4order=4
 
-     do i=1, 5
+     do i=1, 10000
         if(rank==0) then
            print*, "#i=",i
         end if

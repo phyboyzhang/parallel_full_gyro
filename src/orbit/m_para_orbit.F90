@@ -4,7 +4,8 @@ module m_para_orbit
                             para_compute_spl2d_field_point_per_per
                           
   
-  use piclayout, only: ful2d_node,gy2d_node, gy2dmu_node
+  use piclayout, only: ful2d_node,gy2d_node, gy2dmu_node, &
+                       ful2dsend_node,gy2dsend_node
   use paradata_type, only: pic_para_total2d_base
   use orbit_data_base, only: pointin_node,pointin_gy_node,fuloutnode,rk4ful2dnode, &
                              gyoutnode,rk4gy2dnode 
@@ -13,7 +14,11 @@ module m_para_orbit
                                 compute_process_of_point_per_per, &
                                 prep_for_mpi_alltoallv_with_zeroinput, &
                                 coordinates_pointoutbound_per_per  
-  implicit none
+  use m_picutilities, only: mpi2d_alltoallv_send_particle_2d, &
+                            sort_particles_among_ranks, &
+                            sort_particles_among_ranks_gyallmu, &
+                            mpi2d_alltoallv_send_particle_2d_gy 
+ implicit none
  include "mpif.h"
 
   public :: borissolve, &
@@ -25,7 +30,10 @@ module m_para_orbit
             sortposition_by_process_ful2d, &
             compute_f_of_points_out_orbit_ful2d, &
             compute_f_of_points_in_orbit_ful2d, &
-            fulrkfunc_f_per_per            
+            fulrkfunc_f_per_per, &
+            fulrk4solve_and_sort, &
+            borissolve_and_sort,  &
+            gyrork4solveallmu_and_sort            
 
 contains
 
@@ -156,7 +164,28 @@ subroutine boris_single(x,v,dtful,magf,elef)
   end if
 
 20  end subroutine borissolve
- 
+
+
+ subroutine borissolve_and_sort(ful2d_head,pic2d)
+   class(pic_para_total2d_base), pointer :: pic2d
+   class(ful2d_node), pointer, intent(inout) :: ful2d_head
+   class(ful2dsend_node), dimension(:), pointer :: ful2dsend_head
+   int4, dimension(:), pointer :: num
+   int4 :: csize,i
+
+   csize=pic2d%layout2d%collective%size
+   allocate(ful2dsend_head(0:csize-1), num(0:csize-1))
+   do i=0,csize-1
+     allocate(ful2dsend_head(i)%ptr)
+   enddo
+   num=0
+   call borissolve(ful2d_head,pic2d)
+   call sort_particles_among_ranks(ful2d_head,ful2dsend_head, pic2d, num)
+
+   call mpi2d_alltoallv_send_particle_2d(ful2d_head,ful2dsend_head,num,pic2d)
+
+   deallocate(ful2dsend_head,num)
+ end subroutine borissolve_and_sort
 
  subroutine fulrkfunc_f_per_per(f,vec,elef,magf)
    ! It includes the magnetic field perturbation and the electric field perturbation
@@ -359,6 +388,29 @@ subroutine boris_single(x,v,dtful,magf,elef)
     nullify(tmp)
   
   end subroutine fulrk4solve
+
+  subroutine fulrk4solve_and_sort(ful2d_head,pic2d,rk4order,iter_num)
+    class(pic_para_total2d_base), pointer :: pic2d
+    class(ful2d_node), pointer, intent(inout) :: ful2d_head
+    int4, intent(in) :: rk4order, iter_num
+    class(ful2dsend_node), dimension(:), pointer :: ful2dsend_head
+    int4, dimension(:), pointer :: num
+    int4 :: csize, i
+
+    csize=pic2d%layout2d%collective%size
+    allocate(ful2dsend_head(0:csize-1), num(0:csize-1))
+    do i=1,csize
+      allocate(ful2dsend_head(i))
+    enddo
+    num=0  
+    call fulrk4solve(ful2d_head,pic2d,rk4order,iter_num)
+
+    call sort_particles_among_ranks(ful2d_head,ful2dsend_head, pic2d, num)
+  
+    call mpi2d_alltoallv_send_particle_2d(ful2d_head,ful2dsend_head,num,pic2d) 
+   
+    deallocate(ful2dsend_head,num)
+  end subroutine fulrk4solve_and_sort
 
 !  subroutine simple_f_for_test(partlist,order)
 !     class(rk4ful2dnode), pointer,intent(inout) :: partlist
@@ -1304,6 +1356,30 @@ subroutine boris_single(x,v,dtful,magf,elef)
 
    end subroutine gyrork4solveallmu
 
+   subroutine gyrork4solveallmu_and_sort(gy2dmu_head,pic2d,iter_num)
+      class(pic_para_total2d_base), pointer :: pic2d
+      class(gy2dmu_node),dimension(:), pointer, intent(inout) :: gy2dmu_head
+      int4, intent(in) :: iter_num
+      class(gy2dsend_node), dimension(:),pointer :: gy2dsend_head
+      int4 :: csize, mu_num, i,j
+      int4, dimension(:), pointer :: num
+
+      csize=pic2d%layout2d%collective%size
+      mu_num=pic2d%para2d%mu_num
+      allocate(num(0:csize-1))
+      
+      do i=1,mu_num
+        allocate(gy2dsend_head(0:csize-1))
+        num=0
+        do j=0,csize-1
+          allocate(gy2dsend_head(j)%ptr)
+        end do
+        call sort_particles_among_ranks_gyallmu(gy2dmu_head,gy2dsend_head,i,pic2d, num) 
+        call mpi2d_alltoallv_send_particle_2d_gy(gy2dmu_head,gy2dsend_head,num,i,pic2d)
+      enddo 
+
+     deallocate(num,gy2dsend_head) 
+   end subroutine gyrork4solveallmu_and_sort
 
    subroutine para_obtain_interpolation_elefield_per_per_ful(x1, elef, pic2d)
 

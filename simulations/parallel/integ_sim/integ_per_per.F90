@@ -77,7 +77,7 @@ use para_write_file, only: open_file,&
                            para_write_field_file_2d, &
                            para_write_orbit_file_2d, &
                            para_write_orbit_file_2d_gy
-use m_para_orbit, only: borissolve, fulrk4solve, gyrork4solveallmu, &
+use m_para_orbit, only: borissolve_and_sort, fulrk4solve_and_sort, gyrork4solveallmu_and_sort, &
                         para_obtain_interpolation_elefield_per_per_ful, &
                         sortposition_by_process_ful2d, &
                         compute_f_of_points_out_orbit_ful2d, &
@@ -187,9 +187,9 @@ include "mpif.h"
     pic2d%para2d%N_points=50
     pic2d%para2d%iter_number=10
     pic2d%para2d%numcircle=8
-    pic2d%para2d%numparticle=100000
+    pic2d%para2d%numparticle=10000
     pic2d%para2d%dtgy=1.0
-    pic2d%para2d%num_time=15
+    pic2d%para2d%num_time= 4 ! 15
     pic2d%para2d%boundary="double_per"
     pic2d%para2d%geometry="cartesian"
     pic2d%para2d%mu=1.0
@@ -202,8 +202,8 @@ include "mpif.h"
     pic2d%para2d%tempt = 1.0
     pic2d%para2d%mumin=0.0_f64
     pic2d%para2d%mumax=20._F64
-    pic2d%para2d%mu_tail=1000
-    pic2d%para2d%mulast = 10
+    pic2d%para2d%mu_tail=500
+    pic2d%para2d%mulast = 4
 !    pic2d%para2d%mu_num=39
     pic2d%para2d%gyroorder=1
     row=pic2d%para2d%row
@@ -379,24 +379,23 @@ endif
 if(rank==0) then
 print*, "precomputing is finished."
 endif
-  call solve_weight_of_field_among_processes(pic2d%field2d%Bf03,rootdata%ASPL,rootdata,pic2d, &
+  call solve_weight_of_field_among_processes(pic2d%field2d%Bf03,rootdata,pic2d, &
        pic2d%field2d%bf03wg,pic2d%field2d%BF03wg_w,pic2d%field2d%bf03wg_e,pic2d%field2d%bf03wg_n, &
        pic2d%field2d%bf03wg_s, pic2d%field2d%bf03wg_sw,pic2d%field2d%bf03wg_se, &
        pic2d%field2d%bf03wg_nw,pic2d%field2d%bf03wg_ne)
 
-  do i=1,pic2d%para2d%iter_number
+  do i=1,  2  !pic2d%para2d%iter_number
     if(rank==0) then
       print*, "#iter_number=", i
     endif
     !!! and store the equilibrium distirbution on the mesh
     call solve_gyfieldweight_from_fulfield(rootdata,pic2d,pamearray)
-print*, 1
-    call gyrork4solveallmu(gy2dmu_head,pic2d,pic2d%para2d%iter_number)
-print*, 2
+
+    call gyrork4solveallmu_and_sort(gy2dmu_head,pic2d,pic2d%para2d%iter_number)
     call partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d)
-!    pic2d%field2d%deng=pic2d%field2d%deng-pic2d%field2d%dengeq
+
     call compute_gyrodensity_perturbation(rootdata,pic2d,pamearray)
-print*,3
+
     call solve_field_quasi_neutral(rank,rootdata,pic2d,pamearray)  !!! solve the electrostatic potential
 
 !    call diagnoize
@@ -404,12 +403,12 @@ print*,3
        if(rank==0) then
          print*, "#j=",j
        endif
-       call solve_weight_of_field_among_processes(pic2d%field2d%ep,rootdata%ASPL,rootdata,pic2d, &
+       call solve_weight_of_field_among_processes(pic2d%field2d%ep,rootdata,pic2d, &
        pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n,&
        pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
        pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
 
-       call borissolve(ful2d_head,pic2d,(i-1)*pic2d%para2d%num_time+j)
+       call borissolve_and_sort(ful2d_head,pic2d)
 
        call partition_density_to_grid_ful(ful2d_head,pic2d)
 

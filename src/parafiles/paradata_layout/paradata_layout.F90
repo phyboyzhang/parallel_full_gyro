@@ -154,7 +154,11 @@ contains
 
 
 
-     allocate(field2d%dengtot(num1,num2), stat=ierr)
+     allocate(field2d%dengtot(num1,num2),field2d%dengtot_w(num1,row), &
+  field2d%dengtot_e(num1,row),field2d%dengtot_n(row,num2),field2d%dengtot_s(row,num2), &
+  field2d%dengtot_sw(row,row),field2d%dengtot_se(row,row),field2d%dengtot_nw(row,row), &
+  field2d%dengtot_ne(row,row), stat=ierr)
+
      allocate(field2d%dengeqtot(num1,num2), stat=ierr)
 
 

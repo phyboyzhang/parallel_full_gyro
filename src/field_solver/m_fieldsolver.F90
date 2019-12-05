@@ -24,10 +24,10 @@ contains
   !!! This subroutine is used to solve the weight of field. First, gather
   !field data to the root process. Then, obtain the weight coefficient. Last,
   !scatter all weight to each process. 
-    subroutine solve_weight_of_field_among_processes(boxfield,rootmatrix,rootdata,pic2d,boxweight, &
+    subroutine solve_weight_of_field_among_processes(boxfield,rootdata,pic2d,boxweight, &
                rw,re,rn,rs,rsw,rse,rnw,rne)
       real8,dimension(:,:), pointer, intent(in) :: boxfield
-      real8,dimension(:,:), pointer, intent(in) :: rootmatrix
+  !    real8,dimension(:,:), pointer, intent(in) :: rootmatrix
       class(root_precompute_data), pointer, intent(inout) :: rootdata
       class(pic_para_total2d_base), pointer, intent(inout) :: pic2d
       real8, dimension(:,:), pointer, intent(inout) :: boxweight, &
@@ -44,7 +44,7 @@ contains
       call  gather_field_to_rootprocess_per_per(rootdata%field,boxfield,rank,size,boxindex,&
             pic2d%para2d%numproc,pic2d%layout2d)
 
-      call  para_compute_spl2D_weight(rootmatrix,rootdata%field,boxweight,pic2d%para2d%numproc, &
+      call  para_compute_spl2D_weight(rootdata%ASPL,rootdata%field,boxweight,pic2d%para2d%numproc, &
             pic2d%layout2d,pic2d%para2d%boundary)
 
       call  mpi2d_alltoallv_box_per_per(row,comm,rank,numproc,boxweight,rw,re,rn,rs,  &
@@ -124,7 +124,7 @@ contains
        allocate(box(num1,num2),rw(num1,row),re(num1,row),rn(row,num2),rs(row,num2), &
              rsw(row,row),rse(row,row),rnw(row,row),rne(row,row),stat=ierr)
        
-       call solve_weight_of_field_among_processes(pic2d%field2d%gep,rootdata%ASPL,rootdata,pic2d, &
+       call solve_weight_of_field_among_processes(pic2d%field2d%gep,rootdata,pic2d, &
        pic2d%field2d%gep_weight, pic2d%field2d%gepwg_w,pic2d%field2d%gepwg_e,pic2d%field2d%gepwg_n, &
        pic2d%field2d%gepwg_s, pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se, &
        pic2d%field2d%gepwg_nw,pic2d%field2d%gepwg_ne)
@@ -145,7 +145,7 @@ contains
               pic2d%field2d%gepwg_s, pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se, &
               pic2d%field2d%gepwg_nw,pic2d%field2d%gepwg_ne)
 
-         call solve_weight_of_field_among_processes(buf,rootdata%ASPL,rootdata,pic2d, &
+         call solve_weight_of_field_among_processes(buf,rootdata,pic2d, &
               box,rw,re,rn,rs,rsw,rse,rnw,rne)
 
          pic2d%field2d%epgy_weight(i,:,:)=box
@@ -220,8 +220,8 @@ contains
        comm=pic2d%layout2d%collective%comm
        rank=pic2d%layout2d%collective%rank
        numproc=pic2d%para2d%numproc
-       num1=size(pic2d%field2d%deng_weight,1)
-       num2=size(pic2d%field2d%deng_weight,2)
+       num1=size(pic2d%field2d%deng_weight,2)
+       num2=size(pic2d%field2d%deng_weight,3)
        call get_layout_2d_box_index(pic2d%layout2d,rank,boxindex)
        allocate(buf(num1,num2))
        allocate(box(num1,num2),rw(num1,row),re(num1,row),rn(row,num2),rs(row,num2), &
@@ -239,8 +239,10 @@ contains
          rnw=0.0
          rne=0.0
          buf=pic2d%field2d%deng(i,:,:)
-         call solve_weight_of_field_among_processes(buf,rootdata%ASPL,rootdata, &         
+
+         call solve_weight_of_field_among_processes(buf,rootdata, &         
               pic2d,box,rw,re,rn,rs,rsw,rse,rnw,rne)
+
          pic2d%field2d%deng_weight(i,:,:)=box
          pic2d%field2d%dengwg_w(i,:,:)=rw
          pic2d%field2d%dengwg_e(i,:,:)=re
@@ -257,15 +259,18 @@ contains
    
          pic2d%field2d%dengtot=pic2d%field2d%dengtot+buf
        end do
-         
+      
          pic2d%field2d%dengtot=pic2d%field2d%dengtot-pic2d%field2d%dengeqtot 
+!if(rank==0) then
+!print*, pic2d%field2d%dengeqtot
+!endif
          call mpi2d_alltoallv_box_per_per(row,comm,rank,numproc, &
               pic2d%field2d%dengtot,pic2d%field2d%dengtot_w,pic2d%field2d%dengtot_e,pic2d%field2d%dengtot_n, &
               pic2d%field2d%dengtot_s,pic2d%field2d%dengtot_sw,pic2d%field2d%dengtot_se,pic2d%field2d%dengtot_nw, &
               pic2d%field2d%dengtot_ne,boxindex)
 
        deallocate(buf,box,re,rn,rs,rw,rse,rsw,rne,rnw)
-     end subroutine
+     end subroutine compute_gyrodensity_perturbation
 
 !     subroutine compute_fuldensity_perturbation(pic2d)
 

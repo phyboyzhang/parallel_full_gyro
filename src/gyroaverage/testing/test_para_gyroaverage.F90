@@ -232,7 +232,7 @@ end if
          rootdata%ASPL)
   end if
 
-  call solve_weight_of_field_among_processes(pic2d%field2d%ep,rootdata%ASPL,rootdata,pic2d, &
+  call solve_weight_of_field_among_processes(pic2d%field2d%ep,rootdata,pic2d, &
        pic2d%field2d%ep_weight, pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n, &
        pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
        pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
