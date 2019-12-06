@@ -152,7 +152,7 @@ include "mpif.h"
    real8 :: rho, theta,x2(2)
    int4 :: rk4order,cell_per_unit(2)
    int4 :: mu_num
-   int4 :: orbit_field=0
+   int4 :: orbit_field=1
    character(250),dimension(:),pointer :: mugyfileitems
    character(100) :: muth  
 
@@ -174,9 +174,9 @@ include "mpif.h"
     pic2d%para2d%boundary="double_per"
     pic2d%para2d%geometry="cartesian"
     pic2d%para2d%mu=1.0
-    pic2d%para2d%mu_num=1
+    pic2d%para2d%mu_num=1.0
     pic2d%para2d%row=3
-    pic2d%para2d%cell_per_unit=(/10,10/) 
+    pic2d%para2d%cell_per_unit=(/30,30/) 
     pic2d%para2d%dtful=pic2d%para2d%dtgy/real(pic2d%para2d%num_time,8)
     !!! particle in cell part
     pic2d%para2d%sigma = 1.0
@@ -185,10 +185,10 @@ include "mpif.h"
     pic2d%para2d%mumax=20._F64
     pic2d%para2d%gyroorder=1
     row=pic2d%para2d%row
-    amp=0.02
+    amp=0.001  !0.02
     amp_eq=0.0
-    wave_one=20.0
-    wave_two=20.0
+    wave_one=1.0
+    wave_two=1.0
     num_time=pic2d%para2d%num_time
     cell_per_unit=pic2d%para2d%cell_per_unit
 

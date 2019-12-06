@@ -1265,13 +1265,13 @@ subroutine boris_single(x,v,dtful,magf,elef)
 
         do k=1,mu_num
           allocate(partlist,inlist)
-          parnum=0
+ !         parnum=0
           partmp=>partlist
           do while(associated(gy2dmutmp(k)%ptr))
             if(.not.associated(gy2dmutmp(k)%ptr%next)) then
               exit
             else
-          parnum=parnum+1 
+ !         parnum=parnum+1 
               partmp%coords(1:3)=gy2dmutmp(k)%ptr%coords(1:3)
               partmp%vec(1:2)=gy2dmutmp(k)%ptr%coords(1:2)
               partmp%at=0
@@ -1311,33 +1311,33 @@ subroutine boris_single(x,v,dtful,magf,elef)
 !            endif
 !          enddo         
           call sortposition_by_process_gyro2d(num,recnum,partlist,inlist,pic2d,dtgy,order,k,iter_num)
-!          call compute_f_of_points_out_orbit_gyro2d(num,recnum,inlist,partlist,pic2d,k,order,gyroorder,iter_num)
-!          call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,k,order,gyroorder,iter_num)
+          call compute_f_of_points_out_orbit_gyro2d(num,recnum,inlist,partlist,pic2d,k,order,gyroorder,iter_num)
+          call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,k,order,gyroorder,iter_num)
 
-!          deallocate(inlist)
-!          nullify(inlist)
-!          allocate(inlist)
-!          num=0
-!          recnum=0
-!          order=4
-!          call sortposition_by_process_gyro2d(num,recnum,partlist,inlist,pic2d,dtgy,order,k,iter_num)
-!
-!          call compute_f_of_points_out_orbit_gyro2d(num,recnum,inlist,partlist,pic2d,k,order,gyroorder,iter_num)
-!          call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,k,order,gyroorder,iter_num)
+          deallocate(inlist)
+          nullify(inlist)
+          allocate(inlist)
+          num=0
+          recnum=0
+          order=4
+          call sortposition_by_process_gyro2d(num,recnum,partlist,inlist,pic2d,dtgy,order,k,iter_num)
 
-!          gy2dmutmp(k)%ptr=>gy2dmu_head(k)%ptr
-!          partmp=>partlist
-!
-!          do while(associated(gy2dmutmp(k)%ptr).and.associated(partmp))
-!            if(.not.associated(gy2dmutmp(k)%ptr%next).or..not.associated(partmp%next)) then
-!              exit
-!            else
-!              gy2dmutmp(k)%ptr%coords(1:2)=partmp%coords(1:2)+(dtgy/6.0_f64)*(partmp%f1(1:2)+2.0_f64*partmp%f2(1:2) &
-!                        +2.0_f64*partmp%f3(1:2)+partmp%f4(1:2))
-!              gy2dmutmp(k)%ptr=>gy2dmutmp(k)%ptr%next
-!              partmp=>partmp%next
-!            end if
-!          end do
+          call compute_f_of_points_out_orbit_gyro2d(num,recnum,inlist,partlist,pic2d,k,order,gyroorder,iter_num)
+          call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,k,order,gyroorder,iter_num)
+
+          gy2dmutmp(k)%ptr=>gy2dmu_head(k)%ptr
+          partmp=>partlist
+
+          do while(associated(gy2dmutmp(k)%ptr).and.associated(partmp))
+            if(.not.associated(gy2dmutmp(k)%ptr%next).or..not.associated(partmp%next)) then
+              exit
+            else
+              gy2dmutmp(k)%ptr%coords(1:2)=partmp%coords(1:2)+(dtgy/6.0_f64)*(partmp%f1(1:2)+2.0_f64*partmp%f2(1:2) &
+                        +2.0_f64*partmp%f3(1:2)+partmp%f4(1:2))
+              gy2dmutmp(k)%ptr=>gy2dmutmp(k)%ptr%next
+              partmp=>partmp%next
+            end if
+          end do
 
           deallocate(inlist,partlist)
           nullify(partlist)
