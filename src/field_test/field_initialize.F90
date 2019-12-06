@@ -93,8 +93,8 @@ contains
         else if(epkind=="eqp_sin") then
           xmid=(xmax(1)+xmin(1))/2.0_F64
 !          epo=wapone*(sin(wavenumber_one*x(1))+cos(wavenumber_two*x(2)))+wapeq*sin(pi_/xmid*(x(1)-xmid))
-          epo=wapone*(sin(wavenumber_one*x(1))+cos(wavenumber_two)*x(2))+wapeq*sin(x(2))+wapeq*cos(x(1))
- 
+!          epo=wapone*(sin(wavenumber_one*x(1))+cos(wavenumber_two)*x(2))+wapeq*sin(x(2))+wapeq*cos(x(1))
+           epo=wapone*sin(wavenumber_one*x(1))+wapeq*sin(pi_/xmid*(x(2)-xmid)) 
         end if
 
         return
