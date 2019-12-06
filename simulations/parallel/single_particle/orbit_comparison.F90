@@ -174,7 +174,7 @@ include "mpif.h"
     pic2d%para2d%boundary="double_per"
     pic2d%para2d%geometry="cartesian"
     pic2d%para2d%mu=1.0
-    pic2d%para2d%mu_num=1.0
+    pic2d%para2d%mu_num=1
     pic2d%para2d%row=3
     pic2d%para2d%cell_per_unit=(/30,30/) 
     pic2d%para2d%dtful=pic2d%para2d%dtgy/real(pic2d%para2d%num_time,8)
@@ -185,10 +185,10 @@ include "mpif.h"
     pic2d%para2d%mumax=20._F64
     pic2d%para2d%gyroorder=1
     row=pic2d%para2d%row
-    amp=0.005  !0.02
-    amp_eq=0.0
-    wave_one=1.0
-    wave_two=0.0
+    amp=0.001  !0.02
+    amp_eq=0.001
+    wave_one=5.0
+    wave_two=5.0
     num_time=pic2d%para2d%num_time
     cell_per_unit=pic2d%para2d%cell_per_unit
 
@@ -248,7 +248,7 @@ include "mpif.h"
     global_sz(1)=pic2d%layout2d%global_sz1
     global_sz(2)=pic2d%layout2d%global_sz2 
     pamearray=>allocate_parameters_array_2d(mu_num,global_sz)
-
+    pamearray%mu_nodes(1)=1.0
 !    allocate(pic2d%para2d%gboxmin(0:size-1,2),pic2d%para2d%gboxmax(0:size-1,2))
   do i=0,pic2d%para2d%numproc(2)-1      
     do j=0,pic2d%para2d%numproc(1)-1
@@ -327,15 +327,15 @@ call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
        pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
        pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
  
-  call solve_weight_of_field_among_processes(pic2d%field2d%gep,rootdata,pic2d, &
-       pic2d%field2d%gep_weight, pic2d%field2d%gepwg_w,pic2d%field2d%gepwg_e,pic2d%field2d%gepwg_n, &
-       pic2d%field2d%gepwg_s, pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se, &
-       pic2d%field2d%gepwg_nw,pic2d%field2d%gepwg_ne)
+!  call solve_weight_of_field_among_processes(pic2d%field2d%gep,rootdata,pic2d, &
+!       pic2d%field2d%gep_weight, pic2d%field2d%gepwg_w,pic2d%field2d%gepwg_e,pic2d%field2d%gepwg_n, &
+!       pic2d%field2d%gepwg_s, pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se, &
+!       pic2d%field2d%gepwg_nw,pic2d%field2d%gepwg_ne)
   
-  call para_compute_gyroaverage_mesh_field(pic2d%para2d%mu,1,pic2d)
+!  call para_compute_gyroaverage_mesh_field(pic2d%para2d%mu,1,pic2d)
 !print*, rank
   
-!  call solve_gyfieldweight_from_fulfield(rootdata,pic2d,pamearray)
+  call solve_gyfieldweight_from_fulfield(rootdata,pic2d,pamearray)
 
   call solve_weight_of_field_among_processes(pic2d%field2d%Bf03,rootdata,pic2d, &
        pic2d%field2d%bf03wg, pic2d%field2d%BF03wg_w,pic2d%field2d%bf03wg_e,pic2d%field2d%bf03wg_n, &
@@ -433,9 +433,9 @@ call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
        
      end do       
    end if
-    call tp_mpi2d_alltoallv_send_particle_2d(tpful2d_head,numleft_boris,tpful2dsend_head,num_p,numgr,pic2d)
+   call tp_mpi2d_alltoallv_send_particle_2d(tpful2d_head,numleft_boris,tpful2dsend_head,num_p,numgr,pic2d)
    call tp_mpi2d_alltoallv_send_particle_2d(tprk4ful2d_head,numleft_rk4,tprk4ful2dsend_head,num_rk4,numgr,pic2d)
-       call tp_mpi2d_alltoallv_send_particle_2d_gy(tpgy2dmu_head,numleft_gy(1),tpgy2dsend_head, &
+   call tp_mpi2d_alltoallv_send_particle_2d_gy(tpgy2dmu_head,numleft_gy(1),tpgy2dsend_head, &
                                                 num_gy,numgr_gy,1,pic2d)
 
 
@@ -504,7 +504,7 @@ call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
 
 rk4order=4
 
-     do i=1, 6000
+     do i=1, 1000
         if(rank==0) then
            print*, "#i=",i
         end if

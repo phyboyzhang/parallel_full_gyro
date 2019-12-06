@@ -1013,7 +1013,7 @@ subroutine boris_single(x,v,dtful,magf,elef)
              do i=0,numout-1 
                partmp=>partlist
 !if(muind==3.and.order==2.and.rank==3) then
-!print*, "numout=",numout
+!print*, "rank=",rank, "numout=",numout
 !print*, NINT(rbuf2nd(numnode*i))
 !endif  
 
@@ -1022,6 +1022,7 @@ subroutine boris_single(x,v,dtful,magf,elef)
                h=1
                do while(h.ne.NINT(rbuf2nd(numnode*i))) 
                  h=h+1
+
                  if(associated(partmp).and..not.associated(partmp%next)) then
                      print*, "rank=",rank,"h=",h, "rbuf=",rbuf2nd(numnode*i)
                      print*, "muind=",muind, "order=",order
@@ -1035,7 +1036,7 @@ subroutine boris_single(x,v,dtful,magf,elef)
                elef(1:2)=rbuf2nd(numnode*i+1:numnode*i+2)
                deri_bf(1:2)=rbuf2nd(numnode*i+3:numnode*i+4)
                magf(3)=rbuf2nd(numnode*i+5)
- 
+
                if(order==2) then
                  call gyrork_f_per_per(partmp%f2,partmp%coords(3),elef,deri_bf,magf)
 
@@ -1340,7 +1341,7 @@ subroutine boris_single(x,v,dtful,magf,elef)
                         +2.0_f64*partmp%f3(1:2)+partmp%f4(1:2))
 
 !if(iter_num==56.or.iter_num==55.or.iter_num==54.or.iter_num==57) then
-!print*, "iter_num=",iter_num,"coords=",gy2dmutmp(k)%ptr%coords(1:2)
+!print*, "iter_num=",iter_num,"coords=",partmp%f1,partmp%f2
 !print*, "f1=",partmp%f1,"f2=",partmp%f2,"f3=",partmp%f3, "f4=",partmp%f4
 !endif
               gy2dmutmp(k)%ptr=>gy2dmutmp(k)%ptr%next

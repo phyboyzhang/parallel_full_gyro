@@ -725,9 +725,9 @@ contains
           do j=1,rcounts(i)
             x=rbuf(5*h+1:5*h+2)
             call para_compute_spl2d_point_per_per_weight(weight,pic2d%para2d%m_x1,pic2d%para2d%m_x2,x,pic2d%para2d%row, &
-                        pic2d%field2d%gep_weight,pic2d%field2d%gepwg_w,pic2d%field2d%gepwg_e,pic2d%field2d%gepwg_n, &
-                        pic2d%field2d%gepwg_s, &
-                        pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se,pic2d%field2d%gepwg_ne,  &
+                        pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n, &
+                        pic2d%field2d%epwg_s, &
+                        pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se,pic2d%field2d%epwg_ne,  &
                         pic2d%field2d%epwg_nw )    
             call s_localize_new(x,eta_min,eta_max,ii,eta_star,NC-(/1,1/),flag)
             call s_contribution_spl(eta_star,val)

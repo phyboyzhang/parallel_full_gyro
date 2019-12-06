@@ -124,10 +124,10 @@ contains
        allocate(box(num1,num2),rw(num1,row),re(num1,row),rn(row,num2),rs(row,num2), &
              rsw(row,row),rse(row,row),rnw(row,row),rne(row,row),stat=ierr)
        
-       call solve_weight_of_field_among_processes(pic2d%field2d%gep,rootdata,pic2d, &
-       pic2d%field2d%gep_weight, pic2d%field2d%gepwg_w,pic2d%field2d%gepwg_e,pic2d%field2d%gepwg_n, &
-       pic2d%field2d%gepwg_s, pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se, &
-       pic2d%field2d%gepwg_nw,pic2d%field2d%gepwg_ne)
+!       call solve_weight_of_field_among_processes(pic2d%field2d%gep,rootdata,pic2d, &
+!       pic2d%field2d%gep_weight, pic2d%field2d%gepwg_w,pic2d%field2d%gepwg_e,pic2d%field2d%gepwg_n, &
+!       pic2d%field2d%gepwg_s, pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se, &
+!       pic2d%field2d%gepwg_nw,pic2d%field2d%gepwg_ne)
 
        do i=1,pic2d%para2d%mu_num
          buf=0.0
@@ -141,9 +141,9 @@ contains
          rnw=0.0
          rne=0.0 
          call para_compute_gyroaverage_field_on_mesh(pamearray%mu_nodes(i),i,pic2d,buf, &
-              pic2d%field2d%gep_weight,pic2d%field2d%gepwg_w,pic2d%field2d%gepwg_e,pic2d%field2d%gepwg_n, &
-              pic2d%field2d%gepwg_s, pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se, &
-              pic2d%field2d%gepwg_nw,pic2d%field2d%gepwg_ne)
+              pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n, &
+              pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
+              pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
 
          call solve_weight_of_field_among_processes(buf,rootdata,pic2d, &
               box,rw,re,rn,rs,rsw,rse,rnw,rne)
