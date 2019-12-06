@@ -23,7 +23,7 @@ module m_para_orbit
 
   public :: borissolve, &
             fulrk4solve, &
-!            gyrork4solve, &
+            gyrork4solve, &
             gyrork4solveallmu, &
             boris_single, &
             para_obtain_interpolation_elefield_per_per_ful, &
@@ -871,6 +871,9 @@ subroutine boris_single(x,v,dtful,magf,elef)
               case (1)
                 if(order==1) then
                  call gyrork_f_per_per(partmp%f1,partmp%coords(3),elef,deri_bf,magf) 
+!if(iter_num==56.or.iter_num==57.or.iter_num==55) then
+!print*, "vec=",partmp%vec(1:2),"#f1=",partmp%f1,"elef=",elef,"magf=",magf(3)
+!endif
                 else if(order==2) then 
                  call gyrork_f_per_per(partmp%f2,partmp%coords(3),elef,deri_bf,magf)
                 else if(order==3) then
@@ -1084,7 +1087,7 @@ subroutine boris_single(x,v,dtful,magf,elef)
                   magf(2)=0.0_f64
                   elef(3)=0.0_f64
                   do i=0,numnode-1
-                  h=0 
+                  h=1 
                   partmp=>partlist
                   do while(h.ne.NINT(rbuf2nd(numnode*i))) 
                   partmp=>partmp%next
@@ -1094,10 +1097,10 @@ subroutine boris_single(x,v,dtful,magf,elef)
                     stop
                   end if
                   end do
-                  elef(1:2)=rbuf2nd(numnode*h+1:numnode*h+2)
-                  deri_bf(1:2)=rbuf2nd(numnode*h+3:numnode*h+4)
-                  deri_driftsquare(1:2)=rbuf2nd(numnode*h+5:numnode*h+6)
-                  magf(3)=rbuf2nd(numnode*h+7)
+                  elef(1:2)=rbuf2nd(numnode*i+1:numnode*i+2)
+                  deri_bf(1:2)=rbuf2nd(numnode*i+3:numnode*i+4)
+                  deri_driftsquare(1:2)=rbuf2nd(numnode*i+5:numnode*i+6)
+                  magf(3)=rbuf2nd(numnode*i+7)
 
                   if(order==2) then
                     call gyrork_f_per_per_2nd(partmp%f2,partmp%coords(3),elef,deri_bf,magf,deri_driftsquare)
@@ -1138,101 +1141,100 @@ subroutine boris_single(x,v,dtful,magf,elef)
 
    end subroutine compute_f_of_points_out_orbit_gyro2d
 
-!   subroutine gyrork4solve(gy2d_head,pic2d,iter_num)
-!  ! It includes the magnetic field perturbation and the electric field perturbation
-!     class(pic_para_total2d_base), pointer :: pic2d
-!     class(gy2d_node), pointer, intent(inout) :: gy2d_head
-!     int4,intent(in) :: muth
-!     class(gy2d_node), pointer  :: tmp
-!     class(rk4gy2dnode), pointer :: partlist,partmp
-!     class(pointin_gy_node), pointer :: inlist, intmp
-!     int4, intent(in) :: iter_num
-!     int4 :: prank,size,rank,numgr,gyroorder
-!     int4, dimension(:), pointer :: num,recnum
-!     real8 :: dtgy,coords(2)
-!     int4 :: i,j,h,order,comm
-!
-!     rank=pic2d%layout2d%collective%rank
-!     dtgy=pic2d%para2d%dtgy
-!     comm=pic2d%layout2d%collective%comm
-!   
-!    gyroorder=pic2d%para2d%gyroorder
-!    size=pic2d%layout2d%collective%size
-!    dtgy=pic2d%para2d%dtgy
-!    allocate(num(0:size-1),recnum(0:size-1))
-!    allocate(partlist,inlist) 
-!
-!    tmp=>gy2d_head
-!    partmp=>partlist
-!
-!    do while(associated(tmp)) 
-!       if(.not.associated(tmp%next)) then
-!         exit
-!       else
-!          partmp%coords(1:3)=tmp%coords(1:3)
-!          partmp%vec(1:2)=tmp%coords(1:2)
-!          partmp%at=0
-!          tmp=>tmp%next
-!          allocate(partmp%next)
-!          partmp=>partmp%next     
-!       end if
-!    end do
-!
-!    order=1
-!    call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,order,gyroorder,iter_num)
-!
-!    num=0
-!    recnum=0
-!    order=2
-!    call sortposition_by_process_gyro2d(num,recnum,partlist,inlist,pic2d,dtgy,order,iter_num)
-!    call compute_f_of_points_out_orbit_gyro2d(num,recnum,inlist,partlist,pic2d,order,gyroorder,iter_num)
-!    call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,order,gyroorder,iter_num)
-!
-!    deallocate(inlist)
-!    nullify(inlist)
-!    allocate(inlist)    
-!    num=0
-!    recnum=0
-!    order=3
-!    call sortposition_by_process_gyro2d(num,recnum,partlist,inlist,pic2d,dtgy,order,iter_num)
-!    call compute_f_of_points_out_orbit_gyro2d(num,recnum,inlist,partlist,pic2d,order,gyroorder,iter_num)
-!    call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,order,gyroorder,iter_num)
-!
-!
-!
-!    deallocate(inlist)
-!    nullify(inlist)
-!    allocate(inlist)
-!    num=0
-!    recnum=0
-!    order=4
-!    call sortposition_by_process_gyro2d(num,recnum,partlist,inlist,pic2d,dtgy,order,iter_num)
-!    call compute_f_of_points_out_orbit_gyro2d(num,recnum,inlist,partlist,pic2d,order,gyroorder,iter_num)
-!    call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,order,gyroorder,iter_num)    
-!
-!
-!    tmp=>gy2d_head
-!    partmp=>partlist
-!
-!    do while(associated(tmp).and.associated(partmp))
-!       if(.not.associated(tmp%next).or..not.associated(partmp%next)) then
-!         exit
-!       else
-!          tmp%coords(1:2)=partmp%coords(1:2)+(dtgy/6.0_f64)*(partmp%f1(1:2)+2.0_f64*partmp%f2(1:2) &
-!                          +2.0_f64*partmp%f3(1:2)+partmp%f4(1:2))
-!          tmp=>tmp%next
-!          partmp=>partmp%next
-!       end if
-!    end do
-!
-!      deallocate(recnum,num,inlist,partlist)
-!      nullify(partlist)
-!      nullify(inlist)
-!      nullify(partmp)
-!      nullify(tmp)
-!  
-!60  end subroutine gyrork4solve
-!
+   subroutine gyrork4solve(gy2d_head,pic2d,iter_num)
+  ! It includes the magnetic field perturbation and the electric field perturbation
+     class(pic_para_total2d_base), pointer :: pic2d
+     class(gy2d_node), pointer, intent(inout) :: gy2d_head
+     class(gy2d_node), pointer  :: tmp
+     class(rk4gy2dnode), pointer :: partlist,partmp
+     class(pointin_gy_node), pointer :: inlist, intmp
+     int4, intent(in) :: iter_num
+     int4 :: prank,size,rank,numgr,gyroorder
+     int4, dimension(:), pointer :: num,recnum
+     real8 :: dtgy,coords(2)
+     int4 :: i,j,h,order,comm
+
+     rank=pic2d%layout2d%collective%rank
+     dtgy=pic2d%para2d%dtgy
+     comm=pic2d%layout2d%collective%comm
+   
+    gyroorder=pic2d%para2d%gyroorder
+    size=pic2d%layout2d%collective%size
+    dtgy=pic2d%para2d%dtgy
+    allocate(num(0:size-1),recnum(0:size-1))
+    allocate(partlist,inlist) 
+
+    tmp=>gy2d_head
+    partmp=>partlist
+
+    do while(associated(tmp)) 
+       if(.not.associated(tmp%next)) then
+         exit
+       else
+          partmp%coords(1:3)=tmp%coords(1:3)
+          partmp%vec(1:2)=tmp%coords(1:2)
+          partmp%at=0
+          tmp=>tmp%next
+          allocate(partmp%next)
+          partmp=>partmp%next     
+       end if
+    end do
+
+    order=1
+    call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,1,order,gyroorder,iter_num)
+
+    num=0
+    recnum=0
+    order=2
+    call sortposition_by_process_gyro2d(num,recnum,partlist,inlist,pic2d,dtgy,order,1,iter_num)
+    call compute_f_of_points_out_orbit_gyro2d(num,recnum,inlist,partlist,pic2d,1,order,gyroorder,iter_num)
+    call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,1,order,gyroorder,iter_num)
+
+    deallocate(inlist)
+    nullify(inlist)
+    allocate(inlist)    
+    num=0
+    recnum=0
+    order=3
+    call sortposition_by_process_gyro2d(num,recnum,partlist,inlist,pic2d,dtgy,order,1,iter_num)
+    call compute_f_of_points_out_orbit_gyro2d(num,recnum,inlist,partlist,pic2d,1,order,gyroorder,iter_num)
+    call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,1,order,gyroorder,iter_num)
+
+
+
+    deallocate(inlist)
+    nullify(inlist)
+    allocate(inlist)
+    num=0
+    recnum=0
+    order=4
+    call sortposition_by_process_gyro2d(num,recnum,partlist,inlist,pic2d,dtgy,order,1,iter_num)
+    call compute_f_of_points_out_orbit_gyro2d(num,recnum,inlist,partlist,pic2d,1,order,gyroorder,iter_num)
+    call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,1,order,gyroorder,iter_num)    
+
+
+    tmp=>gy2d_head
+    partmp=>partlist
+
+    do while(associated(tmp).and.associated(partmp))
+       if(.not.associated(tmp%next).or..not.associated(partmp%next)) then
+         exit
+       else
+          tmp%coords(1:2)=partmp%coords(1:2)+(dtgy/6.0_f64)*(partmp%f1(1:2)+2.0_f64*partmp%f2(1:2) &
+                          +2.0_f64*partmp%f3(1:2)+partmp%f4(1:2))
+          tmp=>tmp%next
+          partmp=>partmp%next
+       end if
+    end do
+
+      deallocate(recnum,num,inlist,partlist)
+      nullify(partlist)
+      nullify(inlist)
+      nullify(partmp)
+      nullify(tmp)
+  
+60  end subroutine gyrork4solve
+
 
    subroutine gyrork4solveallmu(gy2dmu_head,pic2d,iter_num)
   ! It includes the magnetic field perturbation and the electric field
@@ -1260,7 +1262,12 @@ subroutine boris_single(x,v,dtful,magf,elef)
         allocate(num(0:size-1),recnum(0:size-1))
         allocate(gy2dmutmp(1:mu_num))
         do k=1, mu_num
-           gy2dmutmp(k)%ptr=>gy2dmu_head(k)%ptr 
+           if(.not.associated(gy2dmu_head(k)%ptr)) then
+             print*, "#error: gy2dmu_head(k)%ptr is not initialized, k=",k
+             stop
+           else
+             gy2dmutmp(k)%ptr=>gy2dmu_head(k)%ptr 
+           endif
         enddo 
 
         do k=1,mu_num
@@ -1281,9 +1288,6 @@ subroutine boris_single(x,v,dtful,magf,elef)
             end if
           end do
 
-!if(k==3) then
-!print*, "rank=",rank,"parnum=",parnum
-!endif
           order=1
           call compute_f_of_points_in_orbit_gyro2d(partlist,pic2d,k,order,gyroorder,iter_num)
 
@@ -1334,6 +1338,11 @@ subroutine boris_single(x,v,dtful,magf,elef)
             else
               gy2dmutmp(k)%ptr%coords(1:2)=partmp%coords(1:2)+(dtgy/6.0_f64)*(partmp%f1(1:2)+2.0_f64*partmp%f2(1:2) &
                         +2.0_f64*partmp%f3(1:2)+partmp%f4(1:2))
+
+!if(iter_num==56.or.iter_num==55.or.iter_num==54.or.iter_num==57) then
+!print*, "iter_num=",iter_num,"coords=",gy2dmutmp(k)%ptr%coords(1:2)
+!print*, "f1=",partmp%f1,"f2=",partmp%f2,"f3=",partmp%f3, "f4=",partmp%f4
+!endif
               gy2dmutmp(k)%ptr=>gy2dmutmp(k)%ptr%next
               partmp=>partmp%next
             end if

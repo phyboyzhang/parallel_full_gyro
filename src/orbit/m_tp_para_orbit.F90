@@ -103,7 +103,7 @@ contains
 !end do
 !end if
 
-       deallocate(num)
+       deallocate(num,tpgy2dmutmp)
     end subroutine tp_push_gy_orbit_allmu
 
 

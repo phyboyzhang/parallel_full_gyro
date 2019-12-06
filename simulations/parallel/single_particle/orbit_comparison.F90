@@ -185,10 +185,10 @@ include "mpif.h"
     pic2d%para2d%mumax=20._F64
     pic2d%para2d%gyroorder=1
     row=pic2d%para2d%row
-    amp=0.001  !0.02
+    amp=0.005  !0.02
     amp_eq=0.0
     wave_one=1.0
-    wave_two=1.0
+    wave_two=0.0
     num_time=pic2d%para2d%num_time
     cell_per_unit=pic2d%para2d%cell_per_unit
 
@@ -335,7 +335,7 @@ call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
   call para_compute_gyroaverage_mesh_field(pic2d%para2d%mu,1,pic2d)
 !print*, rank
   
-  call solve_gyfieldweight_from_fulfield(rootdata,pic2d,pamearray)
+!  call solve_gyfieldweight_from_fulfield(rootdata,pic2d,pamearray)
 
   call solve_weight_of_field_among_processes(pic2d%field2d%Bf03,rootdata,pic2d, &
        pic2d%field2d%bf03wg, pic2d%field2d%BF03wg_w,pic2d%field2d%bf03wg_e,pic2d%field2d%bf03wg_n, &
@@ -504,7 +504,7 @@ call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
 
 rk4order=4
 
-     do i=1, 10000
+     do i=1, 6000
         if(rank==0) then
            print*, "#i=",i
         end if
