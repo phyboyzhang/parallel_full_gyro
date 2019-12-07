@@ -117,20 +117,18 @@ contains
        real8,dimension(:,:),pointer :: buf,box,re,rs,rw,rn,rne,rse,rsw,rnw 
        int4 :: i,ierr,num1,num2,row 
 
-       num1=size(pic2d%field2d%gep,1)
-       num2=size(pic2d%field2d%gep,2)
+       num1=size(pic2d%field2d%ep,1)
+       num2=size(pic2d%field2d%ep,2)
        row=pic2d%para2d%row
        allocate(buf(num1,num2))       
        allocate(box(num1,num2),rw(num1,row),re(num1,row),rn(row,num2),rs(row,num2), &
              rsw(row,row),rse(row,row),rnw(row,row),rne(row,row),stat=ierr)
        
-!       call solve_weight_of_field_among_processes(pic2d%field2d%gep,rootdata,pic2d, &
-!       pic2d%field2d%gep_weight, pic2d%field2d%gepwg_w,pic2d%field2d%gepwg_e,pic2d%field2d%gepwg_n, &
-!       pic2d%field2d%gepwg_s, pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se, &
-!       pic2d%field2d%gepwg_nw,pic2d%field2d%gepwg_ne)
-
        do i=1,pic2d%para2d%mu_num
-         buf=0.0
+
+         call para_compute_gyroaverage_mesh_field(pamearray%mu_nodes(i),i,pic2d)
+         buf=pic2d%field2d%epgyro(i,:,:)
+
          box=0.0
          rw=0.0
          re=0.0
@@ -139,25 +137,21 @@ contains
          rsw=0.0
          rse=0.0
          rnw=0.0
-         rne=0.0 
-         call para_compute_gyroaverage_field_on_mesh(pamearray%mu_nodes(i),i,pic2d,buf, &
-              pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n, &
-              pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
-              pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
+         rne=0.0
 
          call solve_weight_of_field_among_processes(buf,rootdata,pic2d, &
               box,rw,re,rn,rs,rsw,rse,rnw,rne)
 
-         pic2d%field2d%epgy_weight(i,:,:)=box
+         pic2d%field2d%epgy_weight(i,:,:)=box         
          pic2d%field2d%epgywg_w(i,:,:)=rw
          pic2d%field2d%epgywg_e(i,:,:)=re
-         pic2d%field2d%epgywg_n(i,:,:)=rn 
+         pic2d%field2d%epgywg_n(i,:,:)=rn
          pic2d%field2d%epgywg_s(i,:,:)=rs
-         pic2d%field2d%epgywg_sw(i,:,:)=rsw 
+         pic2d%field2d%epgywg_sw(i,:,:)=rsw
          pic2d%field2d%epgywg_se(i,:,:)=rse
          pic2d%field2d%epgywg_nw(i,:,:)=rnw
          pic2d%field2d%epgywg_ne(i,:,:)=rne
-       
+      
        end do   
    
        deallocate(buf,box,rw,re,rn,rs,rsw,rse,rnw,rne)

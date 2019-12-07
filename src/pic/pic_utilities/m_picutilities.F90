@@ -742,7 +742,7 @@ contains
               tmp(muind)%ptr=>tmp(muind)%ptr%next
            end if
          else
-           if(.not.associated(tmp(muind)%ptr%next)) then
+           if(.not.associated(tmp(muind)%ptr%next%next)) then
              num(rank)=num(rank)+1
              tmphead(muind)%ptr%next=>tmp(muind)%ptr
              tmphead(muind)%ptr=>tmphead(muind)%ptr%next
@@ -853,7 +853,7 @@ contains
               tmp(muind)%ptr=>tmp(muind)%ptr%next
            end if
          else
-           if(.not.associated(tmp(muind)%ptr%next)) then
+           if(.not.associated(tmp(muind)%ptr%next%next)) then
              num(rank)=num(rank)+1
              tmphead(muind)%ptr%next=>tmp(muind)%ptr
              tmphead(muind)%ptr=>tmphead(muind)%ptr%next

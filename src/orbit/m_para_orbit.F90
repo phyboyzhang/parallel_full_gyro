@@ -1419,20 +1419,46 @@ subroutine boris_single(x,v,dtful,magf,elef)
      real8, dimension(2),intent(in) :: x1
      real8, dimension(3), intent(inout) :: elef
      int4, intent(in) :: muind
-     int4 :: row
+     int4 :: row, num1,num2
      real8 :: deri_firstorder(2)
+     real8,dimension(:,:),pointer :: buf,box,re,rs,rw,rn,rne,rse,rsw,rnw
+     int4 :: ierr
+
+       num1=size(pic2d%field2d%ep,1)
+       num2=size(pic2d%field2d%ep,2)
+       row=pic2d%para2d%row
+       allocate(buf(num1,num2))
+       allocate(box(num1,num2),rw(num1,row),re(num1,row),rn(row,num2),rs(row,num2),&
+             rsw(row,row),rse(row,row),rnw(row,row),rne(row,row),stat=ierr)
 
      row=pic2d%para2d%row
+     box=pic2d%field2d%epgy_weight(muind,:,:)
+     rw=pic2d%field2d%epgywg_w(muind,:,:)
+     re=pic2d%field2d%epgywg_e(muind,:,:)
+     rn=pic2d%field2d%epgywg_n(muind,:,:)
+     rs=pic2d%field2d%epgywg_s(muind,:,:)
+     rsw=pic2d%field2d%epgywg_sw(muind,:,:)
+     rse=pic2d%field2d%epgywg_se(muind,:,:)
+     rne=pic2d%field2d%epgywg_ne(muind,:,:)
+     rnw=pic2d%field2d%epgywg_nw(muind,:,:)
+
      call para_spl2d_firstorder_derivatve_point_per_per(deri_firstorder,x1, &
-      pic2d%para2d%m_x1,pic2d%para2d%m_x2, &
-      row, pic2d%field2d%epgy_weight(muind,:,:),pic2d%field2d%epgywg_w(muind,:,:),pic2d%field2d%epgywg_e(muind,:,:), &
-      pic2d%field2d%epgywg_n(muind,:,:),pic2d%field2d%epgywg_s(muind,:,:),pic2d%field2d%epgywg_sw(muind,:,:), &
-      pic2d%field2d%epgywg_se(muind,:,:),pic2d%field2d%epgywg_ne(muind,:,:),pic2d%field2d%epgywg_nw(muind,:,:)) 
+          pic2d%para2d%m_x1,pic2d%para2d%m_x2, row, &
+          box,rw,re,rn,rs,rsw,rse,rne,rnw)
+
+
+!     call para_spl2d_firstorder_derivatve_point_per_per(deri_firstorder,x1, &
+!      pic2d%para2d%m_x1,pic2d%para2d%m_x2, &
+!      row, pic2d%field2d%epgy_weight(muind,:,:),pic2d%field2d%epgywg_w(muind,:,:),pic2d%field2d%epgywg_e(muind,:,:), &
+!      pic2d%field2d%epgywg_n(muind,:,:),pic2d%field2d%epgywg_s(muind,:,:),pic2d%field2d%epgywg_sw(muind,:,:), &
+!      pic2d%field2d%epgywg_se(muind,:,:),pic2d%field2d%epgywg_ne(muind,:,:),pic2d%field2d%epgywg_nw(muind,:,:)) 
 
      elef(1)=-deri_firstorder(1)
      elef(2)=-deri_firstorder(2)
      elef(3)= 0.0_f64
-
+!print*, elef
+  
+     deallocate(buf,box,re,rs,rw,rn,rne,rse,rsw,rnw)
    end subroutine para_obtain_interpolation_elefield_per_per_gyro
 
    subroutine compute_deri_of_magfield_per_per(deri_bf,coords,pic2d)

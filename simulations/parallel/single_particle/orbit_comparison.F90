@@ -186,7 +186,7 @@ include "mpif.h"
     pic2d%para2d%gyroorder=1
     row=pic2d%para2d%row
     amp=0.001  !0.02
-    amp_eq=0.001
+    amp_eq=0.001  !0.001
     wave_one=5.0
     wave_two=5.0
     num_time=pic2d%para2d%num_time
@@ -305,7 +305,7 @@ call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
   do i=1,dimsize(1)
     do j=1, dimsize(2)
        globalind=globalind_from_localind_2d((/i,j/),pic2d%para2d%numproc,rank,pic2d%layout2d,pic2d%para2d%boundary)
-       pic2d%field2d%gep(i,j)=real(globalind(2),8)*0.1    ! real(globalind(1)+globalind(2), 8)
+       pic2d%field2d%gep(i,j)= real(globalind(2),8)*0.1    ! real(globalind(1)+globalind(2), 8)
        pic2d%field2d%ep(i,j)=real(globalind(2),8)*0.1    ! real(globalind(1)+globalind(2), 8) 
        pic2d%field2d%Bf03(i,j)=1.0
     end do
@@ -336,6 +336,10 @@ call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
 !print*, rank
   
   call solve_gyfieldweight_from_fulfield(rootdata,pic2d,pamearray)
+
+!if(rank==0) then
+!print*, pic2d%field2d%epgy_weight(1,5:7,:)
+!endif
 
   call solve_weight_of_field_among_processes(pic2d%field2d%Bf03,rootdata,pic2d, &
        pic2d%field2d%bf03wg, pic2d%field2d%BF03wg_w,pic2d%field2d%bf03wg_e,pic2d%field2d%bf03wg_n, &
@@ -504,7 +508,7 @@ call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
 
 rk4order=4
 
-     do i=1, 1000
+     do i=1, 500
         if(rank==0) then
            print*, "#i=",i
         end if
