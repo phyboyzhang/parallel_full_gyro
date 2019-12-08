@@ -16,7 +16,7 @@ use spline_module, only: s_splcoefper1d0old,&
                          s_localize_new      
 
 use m_para_spline, only: para_compute_spl2d_point_per_per_weight 
-use piclayout, only: root_precompute_data
+use piclayout, only: root_precompute_data, parameters_array_2d
 use paradata_type, only: pic_para_total2d_base
 use gyroaverage_2d_base, only: gyropoint_node, &
                               gyropoint, &
@@ -308,10 +308,6 @@ contains
                flag=1
                x(1) = x1(1)+rho*points(1,k)
                x(2) = x1(2)+rho*points(2,k)
- !              call coordinates_pointoutbound_per_per(x,pic2d%para2d%gxmin,pic2d%para2d%gxmax)
-! if(rank==1.and.i==1.and.j==1) then
-!print*, "x=",x
-!end if 
 
                rankpoint=compute_process_of_point_per_per(x,pic2d%para2d%numproc, &
                    pic2d%para2d%gxmin,pic2d%para2d%gxmax,pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)
@@ -324,23 +320,13 @@ contains
                curpoint(rankpoint)%ptr%gridind(2)=j
                curpoint(rankpoint)%ptr%xpoint(:)=(/x(1),x(2)/)
 
-!if(rank==3) then
-!h=h+1
-!print*, "rankpoint=",rankpoint,curpoint(rankpoint)%ptr%xpoint, h 
-!end if 
-               allocate(curpoint(rankpoint)%ptr%next)
+              allocate(curpoint(rankpoint)%ptr%next)
                 curpoint(rankpoint)%ptr=>curpoint(rankpoint)%ptr%next   
             end do !!! end k 
         end do  !!! end j
       end do  !!! end i
-!     do i=0, size-1
-!         tot=tot+num_p(i)       
-!      end do
-!    print*, "rank=",rank,tot
 
-!print*, "rank=",rank,"num_p=",num_p
-
-    case default
+     case default
        stop
      end select
    
@@ -378,7 +364,7 @@ contains
     real8, dimension(:),pointer :: sbuf2nd,rbuf2nd
     int4, dimension(:), pointer :: rbuf3rd
     int4 :: ierr,numout,numsend,numrecv,comm
-    int4 :: nearind(2),myrank,root,size
+    int4 :: nearind(2),myrank,root,dsize
     real8 :: weight(-1:2,-1:2),val(-1:2,-1:2)
     real8 :: x(2),eta_min(2),eta_max(2),eta_star(2), rho
     int4 :: ii(2),iii(2), Nc(2), flag, ind(2), ell_1,  &
@@ -390,12 +376,19 @@ contains
 
     root=0
     myrank=pic2d%layout2d%collective%rank
-    size=pic2d%para2d%numproc(1)*pic2d%para2d%numproc(2)
+    dsize=pic2d%para2d%numproc(1)*pic2d%para2d%numproc(2)
     comm=pic2d%layout2d%collective%comm
-    allocate(rcounts(0:size-1),scounts(0:size-1),sdispls(0:size-1),rdispls(0:size-1))  
-    allocate(rbuf3rd(0:size-1),rbufone(0:size-1)) 
-    allocate(curpoint(0:size-1))
-    do i=0,size-1
+    allocate(rcounts(0:dsize-1),scounts(0:dsize-1),sdispls(0:dsize-1),rdispls(0:dsize-1))  
+    allocate(rbuf3rd(0:dsize-1),rbufone(0:dsize-1)) 
+    allocate(curpoint(0:dsize-1))
+    rcounts=0
+    scounts=0
+    sdispls=0
+    rdispls=0
+    rbuf3rd=0
+    rbufone=0
+    
+    do i=0,dsize-1
       if(.not.associated(pointhead(i)%ptr)) then
         stop
       else
@@ -403,18 +396,10 @@ contains
       end if
     end do
 
-!    call sort_quadraturepoint_among_process(mu,myrank,pointhead,num_p,N_points,pic2d)
-!if(myrank==3) then
-!do i=0,size-1
-!print*,"i=",i, "pointhead(i)%ptr=",pointhead(i)%ptr%gridrank,  &
-!pointhead(i)%ptr%gridind(1), pointhead(i)%ptr%gridind(2)
-!enddo
-!end if 
-
-  call mpi_alltoall(num_p,1,mpi_integer,rbufone,1,mpi_integer,comm,ierr)
+    call mpi_alltoall(num_p,1,mpi_integer,rbufone,1,mpi_integer,comm,ierr)
     numsend=0
     numrecv=0
-    do i=0,size-1
+    do i=0,dsize-1
       numsend=numsend+num_p(i)  
       numrecv=numrecv+rbufone(i)
       scounts(i)=num_p(i)*5
@@ -431,7 +416,7 @@ contains
     allocate(rbuf(0:numrecv*5-1))
     h=0
 !    m=0
-    do i=0, size-1
+    do i=0, dsize-1
        do while(associated(curpoint(i)%ptr).and.associated(curpoint(i)%ptr%next))
           sbuf(5*h)=real(curpoint(i)%ptr%gridrank,8)
           sbuf(5*h+1:5*h+2)=curpoint(i)%ptr%xpoint
@@ -444,14 +429,20 @@ contains
 !          end if  
         end do
 50    end do
-
+!if(mu_num==20) then
+!print*, "scouts=",scounts
+!print*, "sdispls=",sdispls
+!print*, "rcouts=",rcounts
+!print*, "rdispls=",rdispls
+!endif
    call mpi_alltoallv(sbuf,scounts,sdispls,mpi_double_precision,rbuf,rcounts,rdispls,mpi_double_precision,comm,ierr) 
+
 
    !!!! now prepare the sendbuf and recvbuf for mpi_gatherv operation     
    !!!! The 33 elements are: for each contribution point, the first is the globalind(1), then 16 pairs of (val(i,j),globalind(2))
    !!!! The globalind(1) is for the grid points which the gyroaverage is computed for. The globalind(2) is for the quadraturepoints.
    numsend=0
-   do i=0,size-1
+   do i=0,dsize-1
       numsend=numsend+rbufone(i)
    end do 
    allocate(sbuf2nd(0:numsend*33-1), stat=ierr)
@@ -460,7 +451,7 @@ contains
    call mpi_gather(numsend,1,mpi_integer,rbuf3rd,1,mpi_integer,root,comm,ierr)
 
    numrecv=0
-   do i=0,size-1
+   do i=0,dsize-1
       numrecv=numrecv+rbuf3rd(i)
       rcounts(i)=rbuf3rd(i)*33
       if(i==0) then
@@ -469,8 +460,13 @@ contains
         rdispls(i)=rdispls(i-1)+rcounts(i-1)
       end if
    end do
-   allocate(rbuf2nd(0:33*numrecv-1),stat=ierr)
-   numout=numrecv
+ !  print*, "rank=",myrank,"numrecv=",numrecv
+   if(numrecv==0) then
+     allocate(rbuf2nd(0:0))
+   else
+     allocate(rbuf2nd(0:33*numrecv-1),stat=ierr)
+   endif
+    numout=numrecv
 
    !!!!! 14 elements: ptrank(which is the current rank), nearind(2), gridind(2), 9 weight(-1:1,-1:1)
 !!                             O
@@ -499,7 +495,7 @@ contains
        startind=startind_of_process(myrank,numproc,pic2d%layout2d)
    
         h=0
-          do i=0,size-1
+          do i=0,dsize-1
             num=0
             do while(num.lt.rbufone(i))
               x=rbuf(5*h+1:5*h+2)
@@ -552,17 +548,21 @@ contains
           end do
         end do
         root=0
-        call MPI_GATHERV(sbuf2nd,33*numsend,MPI_DOUBLE_PRECISION,rbuf2nd,rcounts,rdispls,MPI_DOUBLE_PRECISION,root,comm,ierr) 
+!if(mu_num==9.and.myrank==0) then
+!print*, "rank=",myrank,33*numsend,size(rbuf2nd)
+!!print*, "rank=",myrank, "rcounts=",rcounts
+!!print*, "rank=",myrank, "rdispls=",rdispls
+!!print*, sbuf2nd
+!endif
 
-!!!! Now, get the global stiff matrix on the root process.    
+        call MPI_GATHERV(sbuf2nd,33*numsend,MPI_DOUBLE_PRECISION,rbuf2nd,rcounts,rdispls,MPI_DOUBLE_PRECISION,root,comm,ierr) 
+!!! Now, get the global stiff matrix on the root process.    
 
         if(myrank==root) then
- !     allocate(rootdata%ACONTRI(pic2d%layout2d%global_sz2*pic2d%layout2d%global_sz1, &
- !              pic2d%layout2d%global_sz2*pic2d%layout2d%global_sz1),stat=ierr)
-        rootdata%ACONTRI=0._F64
-        do h=0, numout-1
-        do m=-1,2
-            do l=-1,2
+          rootdata%ACONTRI=0._F64
+          do h=0, numout-1
+            do m=-1,2
+              do l=-1,2
           !!!! Tell whether the the point which h denotes for is counted or not to avoid the repeated counting of points at 
           !!!! the boundary of each box.
 !               IF(rootdata%ACONTRI(NINT(rbuf2nd(33*h)),NINT(rbuf2nd(33*h+4*(m+1)+l+2+16))).ne.0.or. &
@@ -570,15 +570,21 @@ contains
 !                  rootdata%ACONTRI(NINT(rbuf2nd(33*h)),NINT(rbuf2nd(33*h+4*(m+1+2)+l+2+2+16))).ne.0  ) then
 !                  goto 100 
 !               else
-
-                  rootdata%ACONTRI(NINT(rbuf2nd(33*h)),NINT(rbuf2nd(33*h+4*(m+1)+l+2+16))) &
+!        if(mu_num==20) then
+!        print*, rbuf2nd(33*h+4*(m+1)+l+2)
+!        endif
+                 rootdata%ACONTRI(NINT(rbuf2nd(33*h)),NINT(rbuf2nd(33*h+4*(m+1)+l+2+16))) &
                   =rootdata%ACONTRI(NINT(rbuf2nd(33*h)),NINT(rbuf2nd(33*h+4*(m+1)+l+2+16))) &
-                  +rbuf(33*h+4*(m+1)+l+2)
+                  +rbuf2nd(33*h+4*(m+1)+l+2)
+                 
+
 !               end if
             end do
          end do
 100    end do
-    end if  
+    end if 
+
+    deallocate(rcounts,scounts,sdispls,rdispls,rbuf3rd,rbufone,sbuf2nd,rbuf2nd, curpoint) 
        
   end subroutine para_compute_gyroaverage_stiff_matrix
 
@@ -586,10 +592,8 @@ contains
   !the gyroaverage potential on the mesh
   subroutine  para_compute_gyroaverage_mesh_field(mu,muind,pic2d) 
         class(pic_para_total2d_base), pointer,intent(inout) :: pic2d
-        !  real8,dimension(:), intent(in) :: mu
         real8, intent(in) :: mu
         class(gyropoint_node),dimension(:), pointer :: pointhead,curpoint
-  !      int4, dimension(:), pointer,intent(inout) :: num_p
         int4, intent(in) :: muind
         int4, dimension(:), pointer :: rcounts,scounts,sdispls,rdispls,rcountsone, &
         scountstwo,rcountstwo
@@ -724,7 +728,7 @@ contains
                         pic2d%field2d%gep_weight,pic2d%field2d%gepwg_w,pic2d%field2d%gepwg_e,pic2d%field2d%gepwg_n, &
                         pic2d%field2d%gepwg_s, &
                         pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se,pic2d%field2d%gepwg_ne,  &
-                        pic2d%field2d%epwg_nw )    
+                        pic2d%field2d%gepwg_nw )    
             call s_localize_new(x,eta_min,eta_max,ii,eta_star,NC-(/1,1/),flag)
             call s_contribution_spl(eta_star,val)
             fieldvalue=0._f64
@@ -1062,9 +1066,10 @@ contains
 
    end subroutine store_data_on_rootprocess
 
-   subroutine precompute_doublegyroaverage_matrix(rootdata,pic2d)
+   subroutine precompute_doublegyroaverage_matrix(rootdata,pic2d,pamearray)
       class(root_precompute_data), pointer, intent(inout) :: rootdata
       class(pic_para_total2d_base), pointer, intent(in) :: pic2d
+      class(parameters_array_2d), pointer, intent(in) :: pamearray
       real8, dimension(:), pointer :: density
       int4 :: rank,size,boxindex(4)
       int4 :: ierr, numdim,i,j,mu_num,num1,num2
@@ -1094,7 +1099,7 @@ contains
         allocate(buf1(numdim,numdim),buf2(numdim,numdim))
       end if
       do j=1,mu_num
-         mu=pic2d%para2d%mu_nodes(j)   
+         mu=pamearray%mu_nodes(j)   
          buf1=0.0 
          rootdata%ACONTRI=0.0  
          call store_data_on_rootprocess(mu,j,rank,rootdata,pic2d)   
@@ -1104,13 +1109,13 @@ contains
              buf1(i,:)=buf1(i,:)*density(i)   ! ????
            end do
            buf1=matmul(rootdata%ASPL,buf1)
-           buf2=buf2+matmul(rootdata%ACONTRI,buf1)*pic2d%para2d%mu_weights(j)         
+           buf2=buf2+matmul(rootdata%ACONTRI,buf1)*pamearray%mu_weights(j)         
          endif
       end do
       do i=1,numdim
         num1 = modulo(numdim,pic2d%layout2d%global_sz1)
         num2 = (numdim-num1)/pic2d%layout2d%global_sz1+1
-        buf2(i,i)=buf2(i,i)+1.0_f64/pic2d%para2d%temp_i(num1,num2)+1.0_f64/pic2d%para2d%temp_e(num1,num2)
+        buf2(i,i)=buf2(i,i)+1.0_f64/pamearray%temp_i(num1,num2)+1.0_f64/pamearray%temp_e(num1,num2)
       end do
   
       LDA= numdim

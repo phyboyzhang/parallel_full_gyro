@@ -276,12 +276,12 @@ call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
          pic2d%layout2d%global_sz2, &
          rootdata%ASPL)
    end if
-  call solve_weight_of_field_among_processes(pic2d%field2d%ep,rootdata%ASPL,rootdata,pic2d, &
+  call solve_weight_of_field_among_processes(pic2d%field2d%ep,rootdata,pic2d, &
        pic2d%field2d%ep_weight, pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n, &
        pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
        pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
 
-  call solve_weight_of_field_among_processes(pic2d%field2d%Bf03,rootdata%ASPL,rootdata,pic2d, &
+  call solve_weight_of_field_among_processes(pic2d%field2d%Bf03,rootdata,pic2d, &
        pic2d%field2d%bf03wg, pic2d%field2d%BF03wg_w,pic2d%field2d%bf03wg_e,pic2d%field2d%bf03wg_n, &
        pic2d%field2d%bf03wg_s, pic2d%field2d%bf03wg_sw,pic2d%field2d%bf03wg_se, &
        pic2d%field2d%bf03wg_nw,pic2d%field2d%bf03wg_ne)

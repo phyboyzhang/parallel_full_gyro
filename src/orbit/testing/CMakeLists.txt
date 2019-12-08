@@ -16,3 +16,9 @@ Target_Link_Libraries(test_para_orbit_one fieldsolver moveparticles
                       orbit para_random_sample picutilities meshes interpolation
                       parautilities piclayout mpilayout gyroaverage precompute outputdata
                       paradata_type paradata_layout)
+
+ADD_EXECUTABLE(test_gyorbit_allmu test_gyorbit_allmu.F90)
+Target_Link_Libraries(test_gyorbit_allmu fieldsolver moveparticles
+                      orbit para_random_sample picutilities meshes interpolation
+                      parautilities piclayout mpilayout gyroaverage precompute outputdata constants
+                      field_test paradata_layout paradata_type)

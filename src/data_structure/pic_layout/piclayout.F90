@@ -8,6 +8,7 @@ module piclayout
 
 
   public ::   parameters_set_2d, &
+              parameters_array_2d, &
               ful2drank_node, &
               ful2d_node,  &
               ful2dsend_node, & 
@@ -38,11 +39,11 @@ module piclayout
      
      real8 :: mu
      int4  :: mu_num
-     real8, dimension(:),pointer :: mu_nodes,mu_weights
      real8 :: mumin,mumax
      int4 :: mu_scheme
+     int4 :: mu_tail    !! The number of particles located at the last mu number 
+     real8 :: mulast    !! The number of the last mu number which is accepted.
      real8 :: tempt
-     real8, dimension(:,:),pointer :: temp_i,temp_e
 
      int4  :: row   !!! left,right,up,down, the number of lines for the communication for interpolation
      real8 :: gxmin(2),gxmax(2) 
@@ -50,8 +51,16 @@ module piclayout
      int4  :: cell_per_unit(2)
      int4  :: iter_number
      int4  :: gyroorder   ! gyroorder=1, the fisrt order; gyroorder=2, the 2nd order 
+
+!     real8, dimension(:),pointer :: mu_nodes,mu_weights
+!     real8, dimension(:,:),pointer :: temp_i,temp_e
   end type parameters_set_2d
 
+  type parameters_array_2d
+     real8, dimension(:),pointer :: mu_nodes,mu_weights
+     real8, dimension(:,:),pointer :: temp_i,temp_e
+     int4, dimension(:), pointer :: munum_partition
+  end type parameters_array_2d
 !!                    north
 !!              nn*************ee
 !!              nn*************ee

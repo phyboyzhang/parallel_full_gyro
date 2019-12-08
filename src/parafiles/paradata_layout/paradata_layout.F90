@@ -4,17 +4,18 @@ use cartesian_mesh, only: init_para_cartesian_mesh_1d
 use utilities_module, only: muarray_euler_maclaurin_choice
 use paradata_type, only: pic_para_2d_base, &
                          pic_para_total2d_base
-use piclayout, only: pic_field_2d_base
+use piclayout, only: pic_field_2d_base, parameters_array_2d
 use paradata_utilities, only: startind_of_process                         
 implicit none
 
 public::  initialize_pic_para_2d_base, &
           initialize_pic_para_total2d_base, &
-          initialize_pic_para_total2d_base_2nd, &
           allocate_memory_to_field_2d_ful, &
           allocate_memory_to_field_2d_gy,  &
           allocate_memory_to_magfield_2d,  &
-          initialize_parameters_2d
+          allocate_parameters_array_2d,  &
+          initialize_parameters_array_2d, &
+          computing_mu_number
 contains
 
   function initialize_pic_para_2d_base(size)   result(pic2d)
@@ -41,29 +42,32 @@ contains
     allocate(pic2d%field2d)
 
     allocate(pic2d%ful2d_head)
-    allocate(pic2d%ful2dsend_head(0:size-1))
+!    allocate(pic2d%ful2dsend_head(0:size-1))
     allocate(pic2d%gy2d_head)
-    allocate(pic2d%gy2dsend_head(0:size-1))
+!    allocate(pic2d%gy2dsend_head(0:size-1))
 
     allocate(pic2d%para2d)
     allocate(pic2d%para2d%gboxmin(0:size-1,2),pic2d%para2d%gboxmax(0:size-1,2))
 
-    do i=1,size
-      allocate(pic2d%ful2dsend_head(i-1)%ptr)
-      allocate(pic2d%gy2dsend_head(i-1)%ptr)
-    end do
+!    do i=1,size
+!      allocate(pic2d%ful2dsend_head(i-1)%ptr)
+!      allocate(pic2d%gy2dsend_head(i-1)%ptr)
+!    end do
 
   end function initialize_pic_para_total2d_base
 
-  subroutine initialize_pic_para_total2d_base_2nd(pic2d)
-     class(pic_para_total2d_base), pointer, intent(inout) :: pic2d
+  function allocate_parameters_array_2d(mu_num,global_sz) result(pamearray)
+     class(parameters_array_2d), pointer :: pamearray
+     int4, intent(in) :: mu_num, global_sz(2)
 
-     allocate(pic2d%para2d%temp_i(pic2d%layout2d%global_sz1,pic2d%layout2d%global_sz2))
-     allocate(pic2d%para2d%temp_e(pic2d%layout2d%global_sz1,pic2d%layout2d%global_sz2))
-     allocate(pic2d%para2d%mu_nodes(pic2d%para2d%mu_num))
-     allocate(pic2d%para2d%mu_weights(pic2d%para2d%mu_num))
+     allocate(pamearray)
+     allocate(pamearray%temp_i(global_sz(1),global_sz(2)))
+     allocate(pamearray%temp_e(global_sz(1),global_sz(2)))
+     allocate(pamearray%mu_nodes(mu_num))
+     allocate(pamearray%mu_weights(mu_num))
+     allocate(pamearray%munum_partition(mu_num))
 
-  end subroutine initialize_pic_para_total2d_base_2nd
+  end function allocate_parameters_array_2d
 
 
   subroutine allocate_memory_to_field_2d_ful(field2d,num1,num2,row)
@@ -150,7 +154,11 @@ contains
 
 
 
-     allocate(field2d%dengtot(num1,num2), stat=ierr)
+     allocate(field2d%dengtot(num1,num2),field2d%dengtot_w(num1,row), &
+  field2d%dengtot_e(num1,row),field2d%dengtot_n(row,num2),field2d%dengtot_s(row,num2), &
+  field2d%dengtot_sw(row,row),field2d%dengtot_se(row,row),field2d%dengtot_nw(row,row), &
+  field2d%dengtot_ne(row,row), stat=ierr)
+
      allocate(field2d%dengeqtot(num1,num2), stat=ierr)
 
 
@@ -193,16 +201,22 @@ contains
 
   end subroutine
 
-   subroutine initialize_parameters_2d(pic2d)
+   subroutine initialize_parameters_2d(pic2d,pamearray)
       class(pic_para_total2d_base), pointer, intent(inout) :: pic2d
-      int4 :: i,j,startind(2),size1,rank,k
+      class(parameters_array_2d), pointer, intent(inout) :: pamearray
+      int4 :: i,j,startind(2),size1,rank,k,size
       real8 :: dmu,delta(2)
+      
 
+      size=pic2d%layout2d%collective%size
        rank=pic2d%layout2d%collective%rank
 
        do i=1,2
-         delta(i)=1._f64/real(pic2d%para2d%cell_per_unit(i),8)
+         delta(i)=(pic2d%para2d%gxmax(i)-pic2d%para2d%gxmin(i))/  &
+                  real(pic2d%para2d%numproc(i)*pic2d%para2d%cell_per_unit(i),8)
        end do
+
+!       allocate(pic2d%para2d%gboxmin(0:size-1,2),pic2d%para2d%gboxmax(0:size-1,2))
 
        do i=0,pic2d%para2d%numproc(2)-1
          do j=0,pic2d%para2d%numproc(1)-1
@@ -232,11 +246,87 @@ contains
        pic2d%para2d%m_x2=>init_para_cartesian_mesh_1d(pic2d%layout2d%boxes(rank)%j_max-pic2d%layout2d%boxes(rank)%j_min+1, &
        pic2d%para2d%gboxmin(rank,2),pic2d%para2d%gboxmax(rank,2),delta(2))
 
-       call muarray_euler_maclaurin_choice(pic2d%para2d%mumax,pic2d%para2d%mu_num, &
-                                           pic2d%para2d%mu_nodes,pic2d%para2d%mu_weights,pic2d%para2d%mu_scheme)
+!       dmu=pic2d%para2d%mumax/real(pic2d%para2d%mu_num,8)       
+!       do i=1,pic2d%para2d%mu_num
+!         pamearray%mu_nodes(i)=real(i-1,8)*dmu
+!       end do
 
+!       call muarray_euler_maclaurin_choice(pic2d%para2d%mumax,pic2d%para2d%mu_num, &
+!                                           pamearray%mu_nodes,pamearray%mu_weights,pic2d%para2d%mu_scheme)
 
    end subroutine initialize_parameters_2d
 
+
+   subroutine initialize_parameters_array_2d(mumax,mu_num,mu_scheme,pamearray,mu_nodes,mu_weights,munum_partition)
+     class(parameters_array_2d), pointer :: pamearray
+     real8,intent(in) :: mumax
+     int4,intent(in)  :: mu_num,mu_scheme
+     real8, dimension(:), pointer, intent(in) :: mu_nodes,mu_weights
+     int4, dimension(:), pointer,intent(in) :: munum_partition
+        
+!     allocate(mu_nodes(mu_num+1),mu_weights(mu_num+1))
+!     call muarray_euler_maclaurin_choice(mumax,mu_num+1,  &
+!                                         mu_nodes,mu_weights,mu_scheme)
+     
+
+     pamearray%mu_nodes(1:mu_num)=mu_nodes(1:mu_num)
+     pamearray%mu_weights(1:mu_num)=mu_weights(1:mu_num)
+     pamearray%munum_partition(1:mu_num)=munum_partition(1:mu_num)
+ !    deallocate(mu_nodes,mu_weights) 
+   end subroutine
+
+   subroutine computing_mu_number(mu_nods,mu_weigs,munum_part,mu_num,pic2d)
+     class(pic_para_total2d_base), pointer :: pic2d
+     real8, dimension(:), pointer,intent(inout) :: mu_nods,mu_weigs
+     int4, dimension(:), pointer, intent(inout) :: munum_part
+     int4, intent(inout) :: mu_num
+     int4 :: mutest
+     real8, dimension(:), pointer :: mu_nodes,mu_weights   
+     int4, dimension(:), pointer :: munum_partition 
+     real8 :: integ
+     int4 :: i    
+ 
+     mutest=pic2d%para2d%mulast
+     allocate(mu_nodes(mutest),mu_weights(mutest),munum_partition(mutest))
+     munum_partition=0
+     do while(munum_partition(pic2d%para2d%mulast).le.pic2d%para2d%mu_tail)
+       deallocate(mu_nodes,mu_weights,munum_partition)
+       mutest=mutest+5
+  !     print*, mutest
+       if(mutest.ge.100) then
+         print*, "#error: the numer of munodes exceeds the given upbound."
+         stop
+       end if
+       allocate(mu_nodes(mutest),mu_weights(mutest),munum_partition(mutest))
+       call muarray_euler_maclaurin_choice(pic2d%para2d%mumax,mutest,  &
+                                         mu_nodes,mu_weights,pic2d%para2d%mu_scheme)
+       integ=0.0
+       do i=1,mutest
+         integ=integ+exp(-mu_nodes(i)/pic2d%para2d%tempt)*mu_weights(i)
+       end do
+
+       do i=1,mutest
+          munum_partition(i)=NINT(real(pic2d%para2d%numparticle,8)*exp(-mu_nodes(i)/ &
+             pic2d%para2d%tempt)*mu_weights(i)/integ)
+       end do
+     end do
+
+     mu_num=pic2d%para2d%mulast
+     do while(mu_num.le.mutest)
+       if(munum_partition(mu_num+1).ge.1000) then
+         mu_num=mu_num+1
+       else
+         exit
+       end if
+     end do
+     
+     mu_num=mu_num-1   !!! Because the first elements of mu_ndoes and mu_weights equal zero.
+     mu_nods(1:mu_num)=mu_nodes(2:mu_num+1)
+     mu_weigs(1:mu_num)=mu_weights(2:mu_num+1)
+     munum_part(1:mu_num)=munum_partition(2:mu_num+1)
+!     pic2d%para2d%mu_num=mu_num
+
+     deallocate(mu_nodes,mu_weights,munum_partition)
+  end subroutine computing_mu_number
 
 end module paradata_layout

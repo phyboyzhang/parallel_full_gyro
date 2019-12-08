@@ -38,6 +38,7 @@ include "mpif.h"
                 tp_mpi2d_alltoallv_send_particle_2d_gy, &
                 tp_sort_particles_among_ranks_gy, &
                 sort_particles_among_ranks_gy, &
+                sort_particles_among_ranks_gyallmu, &
                 partition_density_to_grid_gy_allmu
 
     
@@ -152,7 +153,7 @@ contains
     xmin(2)=pic2d%para2d%m_x2%eta_min
   
     do i=1,mu_num
-       if(.not.associated(gy2dmutmp(i)%ptr)) then
+      if(.not.associated(gy2dmu_head(i)%ptr)) then
          print*, "error: the particles are not stored in gy2dmutmp(i)%ptr)"
          stop
        end if
@@ -354,10 +355,21 @@ contains
      size=pic2d%layout2d%collective%size
      rank=pic2d%layout2d%collective%rank
      allocate(outcur(0:size-1))
-     tmp=>ful2d_head
+     
+     if(.not.associated(ful2d_head)) then
+       print*, "#error: ful2d_head is not initialized."
+       stop
+     else 
+       tmp=>ful2d_head
+     endif
      do i=0,size-1
-        outcur(i)%ptr=>ful2dsend_head(i)%ptr
-     end do
+        if(.not.associated(ful2dsend_head(i)%ptr)) then
+          print*, "#error: the ith component ul2dsend_head(i)%ptr is not initializd, i=", i
+          stop
+        else 
+          outcur(i)%ptr=>ful2dsend_head(i)%ptr
+        endif 
+    end do
 
      do while(associated(tmp))
        if(.not.associated(tmp%next)) then
@@ -390,15 +402,17 @@ contains
        if(.not.associated(tmp%next)) then
          exit
        else
-         call coordinates_pointoutbound_per_per(tmp%coords(1:2),pic2d%para2d%gxmin,pic2d%para2d%gxmax)
+!         call coordinates_pointoutbound_per_per(tmp%coords(1:2),pic2d%para2d%gxmin,pic2d%para2d%gxmax)
+
          prank=compute_process_of_point_per_per(tmp%coords(1:2),pic2d%para2d%numproc,pic2d%para2d%gxmin, &
                pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)         
          if(prank.ne.rank) then
+
            num(prank)=num(prank)+1
           ! delete this particle from the ful2d_head list
           !  add the deleted particle to full2drank_head list
-           outcur(prank)%ptr%coords=tmp%coords
-          
+
+           outcur(prank)%ptr%coords=tmp%coords          
            allocate(outcur(prank)%ptr%next)
            outcur(prank)%ptr=>outcur(prank)%ptr%next
            if(.not.associated(tmp%next%next)) then
@@ -409,10 +423,19 @@ contains
               tmp=>tmp%next
            end if
          else
-           num(rank)=num(rank)+1
-           tmphead%next=>tmp
-           tmphead=>tmphead%next
-           tmp=>tmp%next
+           if(.not.associated(tmp%next%next)) then
+             num(rank)=num(rank)+1
+             tmphead%next=>tmp
+             tmphead=>tmphead%next
+             tmphead%next=>tmp%next
+             tmphead=>tmphead%next
+             exit
+           else
+             num(rank)=num(rank)+1
+             tmphead%next=>tmp
+             tmphead=>tmphead%next
+             tmp=>tmp%next
+           endif
          end if
 
        endif
@@ -437,9 +460,20 @@ contains
      size=pic2d%layout2d%collective%size
      rank=pic2d%layout2d%collective%rank
      allocate(outcur(0:size-1))
-     tmp=>gy2d_head
+     if(.not.associated(gy2d_head)) then
+       print*, "#error: gy2d_head is not initialized."   
+       stop
+     else 
+       tmp=>gy2d_head
+     endif
+
      do i=0,size-1
-        outcur(i)%ptr=>gy2dsend_head(i)%ptr
+       if(.not.associated(gy2dsend_head(i)%ptr)) then
+          print*, "#error: the ith component gy2dsend_head(i)%ptr is not initialized,i=",i     
+          stop
+       else    
+          outcur(i)%ptr=>gy2dsend_head(i)%ptr
+       endif
      end do
 
      do while(associated(tmp))
@@ -492,10 +526,19 @@ contains
               tmp=>tmp%next
            end if
          else
-           num(rank)=num(rank)+1
-           tmphead%next=>tmp
-           tmphead=>tmphead%next
-           tmp=>tmp%next
+           if(.not.associated(tmp%next%next)) then
+             num(rank)=num(rank)+1
+             tmphead%next=>tmp
+             tmphead=>tmphead%next
+             tmphead%next=>tmp%next
+             tmphead=>tmphead%next
+             exit    
+           else
+             num(rank)=num(rank)+1
+             tmphead%next=>tmp
+             tmphead=>tmphead%next
+             tmp=>tmp%next
+           endif
          end if
 
        endif
@@ -520,9 +563,20 @@ contains
      rank=pic2d%layout2d%collective%rank
      size=pic2d%layout2d%collective%size
      allocate(outcur(0:size-1))
-     tmp=>tp_ful2d_head
+     if(.not.associated(tp_ful2d_head)) then
+       print*, "#error: tp_ful2d_head is not initialized."      
+       stop
+     else
+       tmp=>tp_ful2d_head
+     endif
+ 
      do i=0,size-1
-        outcur(i)%ptr=>tp_ful2dsend_head(i)%ptr
+       if(.not.associated(tp_ful2dsend_head(i)%ptr)) then 
+         print*, "#error: the ith compotent tp_ful2dsend_head(i)%ptr) is not initialized, i=",i
+         stop
+       else
+         outcur(i)%ptr=>tp_ful2dsend_head(i)%ptr
+       endif 
      end do
 
      do while(associated(tmp))
@@ -578,10 +632,19 @@ contains
               tmp=>tmp%next
            end if
          else
-           num(rank)=num(rank)+1
-           tmphead%next=>tmp
-           tmphead=>tmphead%next
-           tmp=>tmp%next
+           if(.not.associated(tmp%next%next)) then
+             num(rank)=num(rank)+1
+             tmphead%next=>tmp
+             tmphead=>tmphead%next
+             tmphead%next=>tmp%next
+             tmphead=>tmphead%next
+             exit
+           else
+             num(rank)=num(rank)+1
+             tmphead%next=>tmp
+             tmphead=>tmphead%next
+             tmp=>tmp%next
+           endif
          end if
 
        endif
@@ -609,9 +672,21 @@ contains
      mu_num=pic2d%para2d%mu_num
      allocate(outcur(0:size-1))
      allocate(tmp(mu_num),tmphead(mu_num))
-     tmp(muind)%ptr=>tp_gy2dmu_head(muind)%ptr
+     do i=1,mu_num
+       if(.not.associated(tp_gy2dmu_head(muind)%ptr)) then
+          print*, "#error: the ith computent of tp_gy2dmu_head is not initialized, i=",i
+          stop
+       else     
+         tmp(muind)%ptr=>tp_gy2dmu_head(muind)%ptr
+       endif
+     enddo
      do i=0,size-1
-        outcur(i)%ptr=>tp_gy2dsend_head(i)%ptr
+       if(.not.associated(tp_gy2dsend_head(i)%ptr)) then
+         print*, "#error: the ith computent of tp_gy2dsend_head is notinitialized, i=",i
+         stop
+       else  
+         outcur(i)%ptr=>tp_gy2dsend_head(i)%ptr
+       endif
      end do
 
      do while(associated(tmp(muind)%ptr))
@@ -667,10 +742,20 @@ contains
               tmp(muind)%ptr=>tmp(muind)%ptr%next
            end if
          else
-           num(rank)=num(rank)+1
-           tmphead(muind)%ptr%next=>tmp(muind)%ptr
-           tmphead(muind)%ptr=>tmphead(muind)%ptr%next
-           tmp(muind)%ptr=>tmp(muind)%ptr%next
+           if(.not.associated(tmp(muind)%ptr%next%next)) then
+             num(rank)=num(rank)+1
+             tmphead(muind)%ptr%next=>tmp(muind)%ptr
+             tmphead(muind)%ptr=>tmphead(muind)%ptr%next
+             tmphead(muind)%ptr%next=>tmp(muind)%ptr%next
+             tmphead(muind)%ptr=>tmphead(muind)%ptr%next
+             exit
+           else
+             num(rank)=num(rank)+1
+             tmphead(muind)%ptr%next=>tmp(muind)%ptr
+             tmphead(muind)%ptr=>tmphead(muind)%ptr%next
+             tmp(muind)%ptr=>tmp(muind)%ptr%next
+           end if
+
          end if
 
        endif
@@ -681,6 +766,116 @@ contains
      deallocate(tmphead)
    end subroutine tp_sort_particles_among_ranks_gy
 
+   subroutine sort_particles_among_ranks_gyallmu(gy2dmu_head,gy2dsend_head, muind,pic2d, num)
+     class(pic_para_total2d_base), pointer :: pic2d
+     class(gy2dmu_node), dimension(:), pointer, intent(inout) :: gy2dmu_head
+     class(gy2dsend_node),dimension(:), pointer, intent(inout) :: gy2dsend_head
+     int4, dimension(:), pointer, intent(inout) :: num
+     int4, intent(in) :: muind
+     class(gy2dmu_node),dimension(:), pointer :: tmp,tmphead
+     class(gy2dsend_node),dimension(:), pointer :: outcur
+     int4 :: size,rank,prank,mu_num
+     real8 :: coords(4)
+     int4 :: i,j
+ 
+     rank=pic2d%layout2d%collective%rank
+     size=pic2d%layout2d%collective%size
+     mu_num=pic2d%para2d%mu_num
+     allocate(outcur(0:size-1))
+     allocate(tmp(mu_num),tmphead(mu_num))
+     do i=1,mu_num
+       if(.not.associated(gy2dmu_head(muind)%ptr)) then
+         print*, "#error: the ith compotent of gy2dmu_head is not initialized,i=",i
+         stop
+       else
+         tmp(muind)%ptr=>gy2dmu_head(muind)%ptr
+       endif
+     enddo
+     do i=0,size-1
+       if(.not.associated(gy2dsend_head(i)%ptr)) then
+         print*, "#error: the ith compotent of gy2dsend_head is not initialized,i=",i
+         stop
+       else
+         outcur(i)%ptr=>gy2dsend_head(i)%ptr
+       endif 
+     end do
+
+     do while(associated(tmp(muind)%ptr))
+       if(.not.associated(tmp(muind)%ptr%next)) then
+         exit
+       else
+!         call coordinates_pointoutbound_per_per(tmp(muind)%ptr%coords(1:2),pic2d%para2d%gxmin,pic2d%para2d%gxmax)
+         prank=compute_process_of_point_per_per(tmp(muind)%ptr%coords(1:2),pic2d%para2d%numproc,pic2d%para2d%gxmin, &
+               pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)           
+         if(prank.ne.rank) then
+            num(prank)=num(prank)+1
+            outcur(prank)%ptr%coords=tmp(muind)%ptr%coords
+!            outcur(prank)%ptr%tp=tmp(muind)%ptr%tp
+            allocate(outcur(prank)%ptr%next)
+            outcur(prank)%ptr=>outcur(prank)%ptr%next
+
+! delete this particle from the ful2d_head list
+            tmp(muind)%ptr=>tmp(muind)%ptr%next
+            gy2dmu_head(muind)%ptr=>tmp(muind)%ptr
+
+         else 
+!!!!tmphead points to pic2d%ful2d_head for the first time
+            num(rank)=num(rank)+1
+            tmphead(muind)%ptr=>gy2dmu_head(muind)%ptr           
+            tmp(muind)%ptr=>tmp(muind)%ptr%next
+            exit
+         end if
+       end if
+    end do
+
+    do while(associated(tmp(muind)%ptr))
+       if(.not.associated(tmp(muind)%ptr%next)) then
+         exit
+       else
+!         call coordinates_pointoutbound_per_per(tmp(muind)%ptr%coords(1:2),pic2d%para2d%gxmin,pic2d%para2d%gxmax)
+         prank=compute_process_of_point_per_per(tmp(muind)%ptr%coords(1:2),pic2d%para2d%numproc,pic2d%para2d%gxmin, &
+               pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)         
+         if(prank.ne.rank) then
+           num(prank)=num(prank)+1
+          ! delete this particle from the ful2d_head list
+          !  add the deleted particle to full2drank_head list
+           outcur(prank)%ptr%coords=tmp(muind)%ptr%coords
+!           outcur(prank)%ptr%tp=tmp(muind)%ptr%tp 
+           allocate(outcur(prank)%ptr%next)
+           outcur(prank)%ptr=>outcur(prank)%ptr%next
+!           tmp=>tmp%next
+!          !!! The following "if" is critical
+           if(.not.associated(tmp(muind)%ptr%next%next)) then
+              tmphead(muind)%ptr%next=>tmp(muind)%ptr%next
+              tmphead(muind)%ptr=>tmphead(muind)%ptr%next
+              exit
+           else 
+              tmp(muind)%ptr=>tmp(muind)%ptr%next
+           end if
+         else
+           if(.not.associated(tmp(muind)%ptr%next%next)) then
+             num(rank)=num(rank)+1
+             tmphead(muind)%ptr%next=>tmp(muind)%ptr
+             tmphead(muind)%ptr=>tmphead(muind)%ptr%next
+             tmphead(muind)%ptr%next=>tmp(muind)%ptr%next
+             tmphead(muind)%ptr=>tmphead(muind)%ptr%next
+             exit
+           else
+             num(rank)=num(rank)+1
+             tmphead(muind)%ptr%next=>tmp(muind)%ptr
+             tmphead(muind)%ptr=>tmphead(muind)%ptr%next
+             tmp(muind)%ptr=>tmp(muind)%ptr%next
+           end if
+
+         end if
+
+       endif
+    end do
+    
+     nullify(outcur)
+     deallocate(tmp)
+     deallocate(tmphead)
+   end subroutine sort_particles_among_ranks_gyallmu
 
 
  !!!! send particles which locate out of current box to those boxes where they locate
@@ -928,7 +1123,9 @@ contains
        rankcur(i)%ptr=>gy2dsend_head(i)%ptr
     end do    
     allocate(coordcur(1:mu_num))
-    coordcur(muind)%ptr=>gy2dmu_head(muind)%ptr
+    do i=1, mu_num
+      coordcur(i)%ptr=>gy2dmu_head(i)%ptr
+    end do
     allocate(rcounts(0:size-1),scounts(0:size-1),sdispls(0:size-1),rdispls(0:size-1),rbuf0(0:size-1))
     call mpi_alltoall(num,1,mpi_integer,rbuf0,1,mpi_integer,comm,ierr)
     call prep_for_mpi_alltoallv_with_zeroinput(rank,size,numgr,num,rbuf0,scounts, &
@@ -987,11 +1184,18 @@ contains
    if(numout==0) then
      goto 20
    else
+!print*, "rank=",rank,numout
      do i=0,numout-1
-        coordcur(muind)%ptr%coords(1:3)=rbuf(4*i:4*i+2)
-        allocate(coordcur(muind)%ptr%next)
-        coordcur(muind)%ptr=>coordcur(muind)%ptr%next
+        coordcur(muind)%ptr%coords(1:3)=rbuf(numgr*i:numgr*i+2)
+        allocate(coordcur(muind)%ptr%next,stat=ierr)
+!        call gp_error(ierr,"coordur")
+        if(ierr.ne.0) then
+           print*, "#error: coordcur is not allocated"
+           stop
+        endif
+       coordcur(muind)%ptr=>coordcur(muind)%ptr%next
      end do
+
 20   end if
 
    deallocate(rankcur)

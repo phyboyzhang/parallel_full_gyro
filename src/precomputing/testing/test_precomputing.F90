@@ -1,4 +1,4 @@
-Program test_para_random_sample
+Program test_precomputing
 #include "work_precision.h"
 use constants, only: pi_
 use cartesian_mesh,   only: cartesian_mesh_1d, &
@@ -157,7 +157,6 @@ include "mpif.h"
     int4, dimension(:), pointer :: num_rk4,num_gy
     real8 :: rho, theta,x2(2)
     int4 :: rk4order,cell_per_unit(2)
-    int4 :: orbit_field=1
 
 !!!! integrated simulation
     class(ful2d_node), pointer :: ful2d_head,ful2dtmp
@@ -174,6 +173,7 @@ include "mpif.h"
 !!!! store density
    character(100) :: filepathgy,filepathful
    int4 :: fileitemful,fileitemgy
+   int4 :: orbit_field=0
 
     allocate(weight(-1:2,-1:2))
     call MPI_INIT(IERR)
@@ -184,7 +184,7 @@ include "mpif.h"
 !!! initialize parameter_2d_sets
     pic2d%para2d%gxmin=(/0.0,0.0/)
     pic2d%para2d%gxmax=(/2.0*pi_,2.0*pi_/)
-    pic2d%para2d%N_points=50
+    pic2d%para2d%N_points=20
     pic2d%para2d%iter_number=100
     pic2d%para2d%numcircle=8
     pic2d%para2d%numparticle=200000
@@ -194,14 +194,14 @@ include "mpif.h"
     pic2d%para2d%geometry="cartesian"
     pic2d%para2d%mu=1.0
     pic2d%para2d%row=3
-    pic2d%para2d%cell_per_unit=(/30,30/) 
+    pic2d%para2d%cell_per_unit=(/15,15/) 
     pic2d%para2d%dtful=pic2d%para2d%dtgy/real(pic2d%para2d%num_time,8)
     pic2d%para2d%mu_scheme = 1
     !!! particle in cell part
     pic2d%para2d%sigma = 25.0
     pic2d%para2d%tempt = 1.0
     pic2d%para2d%mumin=0.0_f64
-    pic2d%para2d%mumax=20._F64
+    pic2d%para2d%mumax=10._F64
     pic2d%para2d%mu_tail=1000
     pic2d%para2d%mulast = 40
 !    pic2d%para2d%mu_num=39
@@ -281,6 +281,9 @@ include "mpif.h"
    call initialize_parameters_array_2d(pic2d%para2d%mumax,mu_num,pic2d%para2d%mu_scheme,pamearray, &
         mu_nodes,mu_weights,munum_partition)  
 
+   pamearray%temp_i=1.0
+   pamearray%temp_e=1.0
+
    sum=0
    do i=1,mu_num
      sum=pamearray%munum_partition(i)+sum
@@ -316,61 +319,38 @@ end if
     boxindex(3)=pic2d%layout2d%boxes(rank)%j_min
     boxindex(4)=pic2d%layout2d%boxes(rank)%j_max 
     
-  !!! prepare the inital distribution of particles
-  call para_accprej_gaus1d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray)  
-
-!if(rank==0) then
-!print*, "munum_partion=",pamearray%munum_partition
-!print*, "mu_nodes=",pamearray%mu_nodes
-!print*, "mu_weights=",pamearray%mu_weights
-!end if
-
-!  do i=1,mu_num
-!     gy2dmutmp(1)%ptr=>gy2dmu_head(1)%ptr
-!     do while(associated(gy2dmutmp(1)%ptr))
-!        if(.not.associated(gy2dmutmp(1)%ptr%next)) then
-!           exit
-!        else 
-!           print*, gy2dmutmp(1)%ptr%coords(1:3)
-!           gy2dmutmp(1)%ptr=>gy2dmutmp(1)%ptr%next
-!        end if
-!      end do
-!  end do
-  
-!print*, 2
-! !!! and store the equilibrium distirbution on the mesh
-  call partition_density_to_grid_ful(ful2d_head,pic2d)
-  call compute_equdensity_for_ful(pic2d)
-  call compare_density_to_initnumber_gy(pic2d%field2d%denfeq, pic2d)
+    do i=1,num1
+       do j=1,num2
+          pic2d%field2d%dengeqtot(i,j)=1.0
+       end do
+    end do
 
 
-!print*, 3
- !!! and store the equilibrium distirbution on the mesh
-  call partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d)
-!if(rank==0) then
-!   print*, "pic2d%deng=",pic2d%field2d%deng(3,:,:)
-!end if
+ !!! prepare the initial field
+  dimsize=dimsize_of_rank_per_per(rank,pic2d%para2d%numproc,pic2d%layout2d)
+   if(orbit_field==0) then
+     do i=1,dimsize(1)
+       do j=1, dimsize(2)
+         globalind=globalind_from_localind_2d((/i,j/),pic2d%para2d%numproc,rank,pic2d%layout2d,pic2d%para2d%boundary)
+         pic2d%field2d%ep(i,j)=real(globalind(2),8)*0.1
+         pic2d%field2d%Bf03(i,j)=1.0
+       end do
+     end do
+   else
+     call para_initialize_field_2d_mesh(amp,amp_eq,wave_one,wave_two, pic2d)
+   endif
+if(rank==0) then
+  print*, "#0"
+end if
 
-  call compute_equdensity_for_gy(pic2d)
-  call compare_density_to_initnumber_gy(pic2d%field2d%dengeqtot, pic2d)
 
-     filepathgy="/home/qmlu/zsx163/parallel_full_gyro/run/orbit/densgy.txt"
-     filepathful="/home/qmlu/zsx163/parallel_full_gyro/run/orbit/densful.txt"
-
-     fileitemful=10
-     fileitemgy =20
-
-     call open_file(fileitemful,filepathful,rank)
-     call open_file(fileitemgy,filepathgy,rank)  
-   
-     call para_write_field_file_2d(pic2d%field2d%denfeq,fileitemful,rootdata,pic2d)
- 
-     call para_write_field_file_2d(pic2d%field2d%dengeqtot,fileitemgy,rootdata,pic2d)
-  
-     call close_file(fileitemful,rank)
-     call close_file(fileitemgy, rank)
+    call precompute_ASPL(rank,global_sz,rootdata%ASPL)
+if(rank==0) then
+  print*, "#1"
+end if
+    call precompute_doublegyroaverage_matrix(rootdata,pic2d,pamearray)
 
      deallocate(pic2d)
      call MPI_FINALIZE(IERR) 
-  end program  test_para_random_sample
+  end program  test_precomputing
 

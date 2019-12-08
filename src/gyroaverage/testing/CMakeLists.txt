@@ -19,7 +19,7 @@ TARGET_LINK_LIBRARIES(test_gyroaverage interpolation
 #Target_Link_Libraries(test_suspect_two interpolation)
 
 Target_Link_Libraries(test_para_gyroaverage meshes interpolation
-                 parautilities piclayout mpilayout gyroaverage paradata_type paradata_layout)
+                 parautilities piclayout mpilayout gyroaverage paradata_type paradata_layout fieldsolver)
 
 Target_Link_Libraries(test_first_gyroaverage meshes interpolation
                  parautilities piclayout mpilayout gyroaverage paradata_type paradata_layout)
