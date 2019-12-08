@@ -14,7 +14,7 @@ implicit none
 
 public :: solve_weight_of_field_among_processes, &
           solve_field_quasi_neutral, &
-          solve_gyfieldweight_from_fulfield, &
+          solve_gyfieldweight_from_field, &
           compute_gyrodensity_perturbation, &
           compute_equdensity_for_ful, &
           compute_equdensity_for_gy, &
@@ -86,7 +86,7 @@ contains
           rootdata%field=matmul(rootdata%prematrix,density)
        end if 
 
-       call scatter_field_from_rootprocess_per_per(rootdata%field,pic2d%field2d%ep,sizeone, &
+       call scatter_field_from_rootprocess_per_per(rootdata%field,pic2d%field2d%gep,sizeone, &
             pic2d%para2d%numproc,global_sz,pic2d%layout2d)
 
        deallocate(density,buffer)
@@ -110,7 +110,7 @@ contains
          
      end subroutine
 
-     subroutine solve_gyfieldweight_from_fulfield(rootdata, pic2d,pamearray)
+     subroutine solve_gyfieldweight_from_field(rootdata, pic2d,pamearray)
        class(root_precompute_data), pointer, intent(inout) :: rootdata
        class(pic_para_total2d_base), pointer, intent(inout) :: pic2d
        class(parameters_array_2d), pointer, intent(in) :: pamearray
@@ -155,7 +155,7 @@ contains
        end do   
    
        deallocate(buf,box,rw,re,rn,rs,rsw,rse,rnw,rne)
-     end subroutine solve_gyfieldweight_from_fulfield
+     end subroutine solve_gyfieldweight_from_field
 
 
      subroutine compute_equdensity_for_gy(pic2d)

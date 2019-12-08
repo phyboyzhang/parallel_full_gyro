@@ -63,7 +63,7 @@ use m_moveparticles, only: push_particle_among_box_ful2d_per_per
 use m_fieldsolver, only: solve_weight_of_field_among_processes, &
                          solve_field_quasi_neutral, &
                          solve_field_ful, &
-                         solve_gyfieldweight_from_fulfield, &
+                         solve_gyfieldweight_from_field, &
                          compute_equdensity_for_ful, &
                          compute_equdensity_for_gy, &
                          compute_gyrodensity_perturbation

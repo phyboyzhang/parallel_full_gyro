@@ -63,7 +63,7 @@ use m_moveparticles, only: push_particle_among_box_ful2d_per_per
 use m_fieldsolver, only: solve_weight_of_field_among_processes, &
                          solve_field_quasi_neutral, &
                          solve_field_ful, &
-                         solve_gyfieldweight_from_fulfield, &
+                         solve_gyfieldweight_from_field, &
                          compute_equdensity_for_ful, &
                          compute_equdensity_for_gy, &
                          compute_gyrodensity_perturbation
@@ -133,9 +133,10 @@ include "mpif.h"
 !    real8 :: elef(3)
 
 !!!!  outputdata 
-    int4 :: fileitem_boris,fileitem_rk4,fileitem_gy
-    character(100) :: filepath_boris,filepath_gy,filepath_rk4,filepath1
-
+    int4 :: fileitemep_boris,fileitemep_rk4,fileitemep_gy
+    character(100) :: filepathep_boris,filepathep_gy,filepathep_rk4,filepathep1
+    int4 :: fileitemden_boris,fileitemden_rk4,fileitemden_gy
+    character(100) :: filepathden_boris,filepathden_gy,filepathden_rk4,filepathden1
 !!!! Test para_orbit
     class(rk4ful2dnode), pointer :: partlist,partmp
     class(pointin_node), pointer :: inlist, intmp
@@ -384,6 +385,25 @@ endif
        pic2d%field2d%bf03wg_s, pic2d%field2d%bf03wg_sw,pic2d%field2d%bf03wg_se, &
        pic2d%field2d%bf03wg_nw,pic2d%field2d%bf03wg_ne)
 
+
+   fileitemep_boris=100
+   fileitemep_rk4  =200
+   fileitemep_gy   =300
+   filepathep1="/home/qmlu/zsx163/parallel_full_gyro/run/ep_"
+
+   filepathep_boris=trim(filepathep1)//"boris"//".txt"
+   filepathep_rk4=trim(filepathep1)//"rk4"//".txt"
+   filepathep_gy  =trim(filepathep1)//"gy"//".txt"
+     call open_file(fileitemep_boris,filepathep_boris,rank)
+     call open_file(fileitemep_rk4,  filepathep_rk4,  rank)
+     call open_file(fileitemep_gy,   filepathep_gy,   rank)
+!     i=1
+!       write(unit=muth,fmt=*) i
+!       filepath_gy=trim(filepath1)//"gy_"//trim(adjustl(muth))//".txt"
+!       call open_file(i,   filepath_gy,   rank)
+
+
+
   do i=1,  3  !pic2d%para2d%iter_number
     if(rank==0) then
       print*, "#iter_number=", i
@@ -393,7 +413,7 @@ endif
        pic2d%field2d%gep_weight, pic2d%field2d%gepwg_w,pic2d%field2d%gepwg_e,pic2d%field2d%gepwg_n, &
        pic2d%field2d%gepwg_s, pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se, &
        pic2d%field2d%gepwg_nw,pic2d%field2d%gepwg_ne)
-    call solve_gyfieldweight_from_fulfield(rootdata,pic2d,pamearray)
+    call solve_gyfieldweight_from_field(rootdata,pic2d,pamearray)
 !print*, 1
     call gyrork4solveallmu_and_sort(gy2dmu_head,pic2d,pic2d%para2d%iter_number)
 !print*, 2
@@ -403,7 +423,8 @@ endif
 !print*, 4
     call solve_field_quasi_neutral(rank,rootdata,pic2d,pamearray)  !!! solve the electrostatic potential
 
-
+    call para_write_field_file_2d(pic2d%field2d%gep,fileitemep_gy,rootdata,pic2d)
+ 
      do j=1,pic2d%para2d%num_time
        if(rank==0) then
          print*, "#j=",j
@@ -420,10 +441,14 @@ endif
        pic2d%field2d%denf=pic2d%field2d%denf-pic2d%field2d%denfeq
        call solve_field_ful(rootdata,pic2d,pamearray)
 
+       call para_write_field_file_2d(pic2d%field2d%ep,fileitemep_boris,rootdata,pic2d)
     end do
 
  end do
 
+     call close_file(fileitemep_boris,rank)
+     call close_file(fileitemep_rk4,rank)
+     call close_file(fileitemep_gy,rank)
 
  !!! and store the equilibrium distirbution on the mesh
     call MPI_FINALIZE(IERR) 

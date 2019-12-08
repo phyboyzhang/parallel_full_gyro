@@ -63,7 +63,7 @@ use m_moveparticles, only: push_particle_among_box_ful2d_per_per
 use m_fieldsolver, only: solve_weight_of_field_among_processes, &
                          solve_field_quasi_neutral, &
                          solve_field_ful, &
-                         solve_gyfieldweight_from_fulfield, &
+                         solve_gyfieldweight_from_field, &
                          compute_equdensity_for_ful, &
                          compute_equdensity_for_gy, &
                          compute_gyrodensity_perturbation
@@ -352,7 +352,7 @@ endif
        pic2d%field2d%bf03wg_s, pic2d%field2d%bf03wg_sw,pic2d%field2d%bf03wg_se, &
        pic2d%field2d%bf03wg_nw,pic2d%field2d%bf03wg_ne)
 
-    call solve_gyfieldweight_from_fulfield(rootdata,pic2d,pamearray)
+    call solve_gyfieldweight_from_field(rootdata,pic2d,pamearray)
 
     call gyrork4solveallmu(gy2dmu_head,pic2d,pic2d%para2d%iter_number)
 

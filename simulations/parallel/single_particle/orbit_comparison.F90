@@ -57,7 +57,7 @@ use para_random_sample, only: para_accept_reject_gaussian1d_ful2d_per_per, &
 
 use m_moveparticles, only: push_particle_among_box_ful2d_per_per
 use m_fieldsolver, only: solve_weight_of_field_among_processes, &
-                         solve_gyfieldweight_from_fulfield
+                         solve_gyfieldweight_from_field
 use m_precompute,  only: precompute_ASPL
 use m_moveparticles, only: new_position_per_per_ful, &
                            push_particle_among_box_ful2d_per_per, &
@@ -335,7 +335,7 @@ call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
 !  call para_compute_gyroaverage_mesh_field(pic2d%para2d%mu,1,pic2d)
 !print*, rank
   
-  call solve_gyfieldweight_from_fulfield(rootdata,pic2d,pamearray)
+  call solve_gyfieldweight_from_field(rootdata,pic2d,pamearray)
 
 !if(rank==0) then
 !print*, pic2d%field2d%epgy_weight(1,5:7,:)
