@@ -187,14 +187,14 @@ include "mpif.h"
     pic2d%para2d%N_points=50
     pic2d%para2d%iter_number=10
     pic2d%para2d%numcircle=8
-    pic2d%para2d%numparticle=10000
+    pic2d%para2d%numparticle=100000
     pic2d%para2d%dtgy=1.0
     pic2d%para2d%num_time= 4 ! 15
     pic2d%para2d%boundary="double_per"
     pic2d%para2d%geometry="cartesian"
     pic2d%para2d%mu=1.0
     pic2d%para2d%row=3
-    pic2d%para2d%cell_per_unit=(/10,10/) 
+    pic2d%para2d%cell_per_unit=(/15,15/) 
     pic2d%para2d%dtful=pic2d%para2d%dtgy/real(pic2d%para2d%num_time,8)
     pic2d%para2d%mu_scheme = 1
     !!! particle in cell part
@@ -202,15 +202,15 @@ include "mpif.h"
     pic2d%para2d%tempt = 1.0
     pic2d%para2d%mumin=0.0_f64
     pic2d%para2d%mumax=20._F64
-    pic2d%para2d%mu_tail=500
-    pic2d%para2d%mulast = 4
+    pic2d%para2d%mu_tail=1000
+    pic2d%para2d%mulast = 20
 !    pic2d%para2d%mu_num=39
     pic2d%para2d%gyroorder=1
     row=pic2d%para2d%row
-    amp=0.02
-    amp_eq=0.0
-    wave_one=20.0
-    wave_two=20.0
+    amp=0.001
+    amp_eq=0.01
+    wave_one=5.0
+    wave_two=5.0
     num_time=pic2d%para2d%num_time
     cell_per_unit=pic2d%para2d%cell_per_unit
 
@@ -384,21 +384,26 @@ endif
        pic2d%field2d%bf03wg_s, pic2d%field2d%bf03wg_sw,pic2d%field2d%bf03wg_se, &
        pic2d%field2d%bf03wg_nw,pic2d%field2d%bf03wg_ne)
 
-  do i=1,  2  !pic2d%para2d%iter_number
+  do i=1,  3  !pic2d%para2d%iter_number
     if(rank==0) then
       print*, "#iter_number=", i
     endif
     !!! and store the equilibrium distirbution on the mesh
+    call solve_weight_of_field_among_processes(pic2d%field2d%gep,rootdata,pic2d, &
+       pic2d%field2d%gep_weight, pic2d%field2d%gepwg_w,pic2d%field2d%gepwg_e,pic2d%field2d%gepwg_n, &
+       pic2d%field2d%gepwg_s, pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se, &
+       pic2d%field2d%gepwg_nw,pic2d%field2d%gepwg_ne)
     call solve_gyfieldweight_from_fulfield(rootdata,pic2d,pamearray)
-
+!print*, 1
     call gyrork4solveallmu_and_sort(gy2dmu_head,pic2d,pic2d%para2d%iter_number)
+!print*, 2
     call partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d)
-
+!print*, 3
     call compute_gyrodensity_perturbation(rootdata,pic2d,pamearray)
-
+!print*, 4
     call solve_field_quasi_neutral(rank,rootdata,pic2d,pamearray)  !!! solve the electrostatic potential
 
-!    call diagnoize
+
      do j=1,pic2d%para2d%num_time
        if(rank==0) then
          print*, "#j=",j
@@ -415,11 +420,9 @@ endif
        pic2d%field2d%denf=pic2d%field2d%denf-pic2d%field2d%denfeq
        call solve_field_ful(rootdata,pic2d,pamearray)
 
-
-!       call diagnoize ????
     end do
 
-  end do
+ end do
 
 
  !!! and store the equilibrium distirbution on the mesh

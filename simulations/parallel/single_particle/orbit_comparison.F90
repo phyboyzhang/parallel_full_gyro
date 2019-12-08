@@ -185,10 +185,10 @@ include "mpif.h"
     pic2d%para2d%mumax=20._F64
     pic2d%para2d%gyroorder=1
     row=pic2d%para2d%row
-    amp=0.001  !0.02
-    amp_eq=0.001  !0.001
-    wave_one=5.0
-    wave_two=5.0
+    amp=0.005  !0.02
+    amp_eq=0.005  !0.001
+    wave_one=35.0
+    wave_two=35.0
     num_time=pic2d%para2d%num_time
     cell_per_unit=pic2d%para2d%cell_per_unit
 
@@ -327,10 +327,10 @@ call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
        pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
        pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
  
-!  call solve_weight_of_field_among_processes(pic2d%field2d%gep,rootdata,pic2d, &
-!       pic2d%field2d%gep_weight, pic2d%field2d%gepwg_w,pic2d%field2d%gepwg_e,pic2d%field2d%gepwg_n, &
-!       pic2d%field2d%gepwg_s, pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se, &
-!       pic2d%field2d%gepwg_nw,pic2d%field2d%gepwg_ne)
+  call solve_weight_of_field_among_processes(pic2d%field2d%gep,rootdata,pic2d, &
+       pic2d%field2d%gep_weight, pic2d%field2d%gepwg_w,pic2d%field2d%gepwg_e,pic2d%field2d%gepwg_n, &
+       pic2d%field2d%gepwg_s, pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se, &
+       pic2d%field2d%gepwg_nw,pic2d%field2d%gepwg_ne)
   
 !  call para_compute_gyroaverage_mesh_field(pic2d%para2d%mu,1,pic2d)
 !print*, rank
