@@ -40,7 +40,13 @@ COMMENT "Delete all .a, .mod, .o and folders /modules, /bin" VERBATIM)
 ADD_SUBDIRECTORY( external )
 
 find_package(LAPACK)
+if(LAPACK_FOUND)
+  MESSAGE(STATUS "The path of lapack is ${LAPACK_LIBRARIES}")
+endif()
 find_package(BLAS)
+if(BLAS_FOUND)
+  MESSAGE(STATUS "The path of blas is ${BLAS_LIBRARIES}")
+endif()
 find_library(FFTW3_LIBRARIES fftw3)
 find_library(DFFTPACK_LIBRARIES dfftpack)
 

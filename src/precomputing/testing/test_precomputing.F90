@@ -279,7 +279,7 @@ include "mpif.h"
 
    call initialize_parameters_2d(pic2d,pamearray) 
    call initialize_parameters_array_2d(pic2d%para2d%mumax,mu_num,pic2d%para2d%mu_scheme,pamearray, &
-        mu_nodes,mu_weights,munum_partition)  
+        mu_nodes,mu_weights,munum_partition,pic2d%para2d%tempt)  
 
    pamearray%temp_i=1.0
    pamearray%temp_e=1.0

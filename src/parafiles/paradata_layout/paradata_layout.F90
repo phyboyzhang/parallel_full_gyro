@@ -257,23 +257,31 @@ contains
    end subroutine initialize_parameters_2d
 
 
-   subroutine initialize_parameters_array_2d(mumax,mu_num,mu_scheme,pamearray,mu_nodes,mu_weights,munum_partition)
+   subroutine initialize_parameters_array_2d(mumax,mu_num,mu_scheme,pamearray,mu_nodes,mu_weights,munum_partition,temp)
      class(parameters_array_2d), pointer :: pamearray
-     real8,intent(in) :: mumax
+     real8,intent(in) :: mumax,temp
      int4,intent(in)  :: mu_num,mu_scheme
      real8, dimension(:), pointer, intent(in) :: mu_nodes,mu_weights
      int4, dimension(:), pointer,intent(in) :: munum_partition
-        
+ 
+     int4 :: i,j,numdim     
 !     allocate(mu_nodes(mu_num+1),mu_weights(mu_num+1))
 !     call muarray_euler_maclaurin_choice(mumax,mu_num+1,  &
 !                                         mu_nodes,mu_weights,mu_scheme)
-     
+     numdim=size(pamearray%temp_i,1)
 
      pamearray%mu_nodes(1:mu_num)=mu_nodes(1:mu_num)
      pamearray%mu_weights(1:mu_num)=mu_weights(1:mu_num)
      pamearray%munum_partition(1:mu_num)=munum_partition(1:mu_num)
  !    deallocate(mu_nodes,mu_weights) 
-   end subroutine
+
+     do i=1,numdim
+       do j=1, numdim
+          pamearray%temp_i(i,j)=temp
+          pamearray%temp_e(i,j)=temp
+       enddo
+     enddo
+   end subroutine  initialize_parameters_array_2d
 
    subroutine computing_mu_number(mu_nods,mu_weigs,munum_part,mu_num,pic2d)
      class(pic_para_total2d_base), pointer :: pic2d

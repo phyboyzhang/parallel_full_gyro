@@ -82,9 +82,16 @@ contains
        call get_layout_2d_box_index( pic2d%layout2d, rank, boxindex )       
        call gather_field_to_rootprocess_per_per(density,buffer,rank, &
            sizeone,boxindex,pic2d%para2d%numproc,pic2d%layout2d)
+
+!if(rank==0) then
+!print*, "prematrix=",rootdata%prematrix(1:6,:)
+!
+!print*, "density=", density
+!endif
        if(rank==0) then
-          rootdata%field=matmul(rootdata%prematrix,density)
-       end if 
+          rootdata%field=matmul(rootdata%prematrix,density) 
+      end if 
+
 
        call scatter_field_from_rootprocess_per_per(rootdata%field,pic2d%field2d%gep,sizeone, &
             pic2d%para2d%numproc,global_sz,pic2d%layout2d)

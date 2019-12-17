@@ -195,7 +195,7 @@ include "mpif.h"
     pic2d%para2d%geometry="cartesian"
     pic2d%para2d%mu=1.0
     pic2d%para2d%row=3
-    pic2d%para2d%cell_per_unit=(/15,15/) 
+    pic2d%para2d%cell_per_unit=(/10,10/) 
     pic2d%para2d%dtful=pic2d%para2d%dtgy/real(pic2d%para2d%num_time,8)
     pic2d%para2d%mu_scheme = 1
     !!! particle in cell part
@@ -280,7 +280,7 @@ include "mpif.h"
 
    call initialize_parameters_2d(pic2d,pamearray) 
    call initialize_parameters_array_2d(pic2d%para2d%mumax,mu_num,pic2d%para2d%mu_scheme,pamearray, &
-        mu_nodes,mu_weights,munum_partition)  
+        mu_nodes,mu_weights,munum_partition,pic2d%para2d%tempt)  
 
    sum=0
    do i=1,mu_num
@@ -404,7 +404,7 @@ endif
 
 
 
-  do i=1,  3  !pic2d%para2d%iter_number
+  do i=1,  100  !pic2d%para2d%iter_number
     if(rank==0) then
       print*, "#iter_number=", i
     endif
@@ -413,6 +413,7 @@ endif
        pic2d%field2d%gep_weight, pic2d%field2d%gepwg_w,pic2d%field2d%gepwg_e,pic2d%field2d%gepwg_n, &
        pic2d%field2d%gepwg_s, pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se, &
        pic2d%field2d%gepwg_nw,pic2d%field2d%gepwg_ne)
+
     call solve_gyfieldweight_from_field(rootdata,pic2d,pamearray)
 !print*, 1
     call gyrork4solveallmu_and_sort(gy2dmu_head,pic2d,pic2d%para2d%iter_number)
@@ -422,6 +423,9 @@ endif
     call compute_gyrodensity_perturbation(rootdata,pic2d,pamearray)
 !print*, 4
     call solve_field_quasi_neutral(rank,rootdata,pic2d,pamearray)  !!! solve the electrostatic potential
+!if(rank==0.and.i==1) then
+!print*, pic2d%field2d%gep
+!endif
 
     call para_write_field_file_2d(pic2d%field2d%gep,fileitemep_gy,rootdata,pic2d)
  
@@ -441,8 +445,9 @@ endif
        pic2d%field2d%denf=pic2d%field2d%denf-pic2d%field2d%denfeq
        call solve_field_ful(rootdata,pic2d,pamearray)
 
-       call para_write_field_file_2d(pic2d%field2d%ep,fileitemep_boris,rootdata,pic2d)
+       !call para_write_field_file_2d(pic2d%field2d%ep,fileitemep_boris,rootdata,pic2d)
     end do
+       call para_write_field_file_2d(pic2d%field2d%ep,fileitemep_boris,rootdata,pic2d)
 
  end do
 

@@ -57,7 +57,8 @@ use m_picutilities, only: singlepart_to_mesh, &
 
 use para_random_sample, only: para_accept_reject_gaussian1d_ful2d_per_per, &
                               para_accprej_gaus2d2v_fulgyro_unifield_per_per, &
-                              para_accprej_gaus1d2v_fulgyro_unifield_per_per
+                              para_accprej_gaus1d2v_fulgyro_unifield_per_per, &
+                              congru_accprej_gaus1d2v_fulgyro_unifield_per_per
 
 use m_moveparticles, only: push_particle_among_box_ful2d_per_per
 use m_fieldsolver, only: solve_weight_of_field_among_processes, &
@@ -187,7 +188,7 @@ include "mpif.h"
     pic2d%para2d%N_points=50
     pic2d%para2d%iter_number=100
     pic2d%para2d%numcircle=8
-    pic2d%para2d%numparticle=200000
+    pic2d%para2d%numparticle=100000
     pic2d%para2d%dtgy=1.0
     pic2d%para2d%num_time=15
     pic2d%para2d%boundary="double_per"
@@ -201,9 +202,9 @@ include "mpif.h"
     pic2d%para2d%sigma = 25.0
     pic2d%para2d%tempt = 1.0
     pic2d%para2d%mumin=0.0_f64
-    pic2d%para2d%mumax=20._F64
-    pic2d%para2d%mu_tail=1000
-    pic2d%para2d%mulast = 40
+    pic2d%para2d%mumax=4._F64
+    pic2d%para2d%mu_tail=500
+    pic2d%para2d%mulast = 10
 !    pic2d%para2d%mu_num=39
     pic2d%para2d%gyroorder=1
     row=pic2d%para2d%row
@@ -279,7 +280,7 @@ include "mpif.h"
 
    call initialize_parameters_2d(pic2d,pamearray) 
    call initialize_parameters_array_2d(pic2d%para2d%mumax,mu_num,pic2d%para2d%mu_scheme,pamearray, &
-        mu_nodes,mu_weights,munum_partition)  
+        mu_nodes,mu_weights,munum_partition,pic2d%para2d%tempt)  
 
    sum=0
    do i=1,mu_num
@@ -317,7 +318,10 @@ end if
     boxindex(4)=pic2d%layout2d%boxes(rank)%j_max 
     
   !!! prepare the inital distribution of particles
-  call para_accprej_gaus1d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray)  
+if(rank==0) then
+  print*, "#the sampling of particles begins"
+endif
+  call congru_accprej_gaus1d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray)  
 
 !if(rank==0) then
 !print*, "munum_partion=",pamearray%munum_partition
@@ -372,5 +376,8 @@ end if
 
      deallocate(pic2d)
      call MPI_FINALIZE(IERR) 
+     if(rank==0) then
+       print*, "test successes."
+     endif
   end program  test_para_random_sample
 

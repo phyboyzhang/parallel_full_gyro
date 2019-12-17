@@ -18,3 +18,6 @@ target_link_libraries(random_sample_mu)
 
 ADD_EXECUTABLE(test_pic_noise test_pic_noise.F90)
 Target_Link_Libraries(test_pic_noise piclayout meshes picutilities)
+
+Add_executable(random_congruence random_congruence.F90)
+Target_Link_Libraries(random_congruence para_random_sample)

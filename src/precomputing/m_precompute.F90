@@ -36,12 +36,13 @@ contains
       real8, dimension(:), pointer :: density
       int4 :: rank,size,boxindex(4)
       int4 :: ierr, numdim,i,j,mu_num,num1,num2
-      real8, dimension(:,:), pointer :: buf,buf1,buf2
+      real8, dimension(:,:), pointer :: buf,buf1
+      real8, dimension(:,:), allocatable :: buf2
       real8 :: mu
 
       int4 :: LDA, INFO, LWORK
-      int4, dimension(:), pointer :: ipiv
-      real8, dimension(:), pointer :: work
+      int4, dimension(:), allocatable :: ipiv
+      real8, dimension(:), allocatable :: work
 
       numdim=pic2d%layout2d%global_sz1*pic2d%layout2d%global_sz2
       rank=pic2d%layout2d%collective%rank
@@ -67,7 +68,7 @@ contains
            buf1=0.0
          end if
 if(rank==0) then
-print*, "j=",j
+print*, "double gyroaverge for the jth mu,#j=",j
 end if
          call store_data_on_rootprocess(mu,j,rank,rootdata,pic2d)
 
@@ -83,23 +84,26 @@ end if
          endif
       end do
 
-    if(rank==0) then
-     do i=1,numdim
-      num1 = modulo(i,pic2d%layout2d%global_sz1)
-      num2 = (i-num1)/pic2d%layout2d%global_sz1+1 
-       buf2(i,i)=buf2(i,i)+1.0_f64/pamearray%temp_i(num1,num2)+1.0_f64/pamearray%temp_e(num1,num2)
-      end do
-      LDA= numdim
-      LWORK = numdim+15
-      allocate(IPIV(NUMDIM))
-      allocate(work(NUMDIM))
-      call dgetrf(numdim,numdim,buf2,LDA,IPIV,INFO)
-      call dgetri(numdim,buf2,LDA,IPIV,WORK,LWORK,INFO)
+      if(rank==0) then
+        do i=1,numdim
+          num1 = modulo(i,pic2d%layout2d%global_sz1)
+          num2 = (i-num1)/pic2d%layout2d%global_sz1+1 
+          buf2(i,i)=buf2(i,i)+1.0_f64/pamearray%temp_i(num1,num2)+1.0_f64/pamearray%temp_e(num1,num2)
+        end do
 
-      rootdata%prematrix=buf2
+
+        LDA= numdim
+        LWORK = numdim*64
+        allocate(IPIV(NUMDIM))
+        allocate(work(LWORK))
+        call dgetrf(numdim,numdim,buf2,LDA,IPIV,INFO)
+
+        call dgetri(numdim,buf2,LDA,IPIV,WORK,LWORK,INFO)
+   
+        rootdata%prematrix=buf2
     
       
-      deallocate(buf1,buf2)
+        deallocate(buf1,buf2)
       endif       
 
      end subroutine precompute_doublegyroaverage_matrix
