@@ -116,7 +116,7 @@ include "mpif.h"
     pic2d%para2d%cell_per_unit=(/2,2/) 
     
     !!! particle in cell part
-    pic2d%para2d%numparticle=50
+    pic2d%para2d%numequ=50
     pic2d%para2d%numcircle = 4
     pic2d%para2d%sigma = 1.0
     pic2d%para2d%tempt = 1.0

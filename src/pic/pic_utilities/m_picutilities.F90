@@ -54,17 +54,30 @@ contains
     int4  :: boxindex(4),index(2), rank
     int4 :: row=1, n1,n2, numproc1,numproc2
     int4 :: ierr, i
-           
+          
+    rank=pic2d%layout2d%collective%rank 
     delta(1)=pic2d%para2d%m_x1%delta_eta
     delta(2)=pic2d%para2d%m_x2%delta_eta
     xmin(1)=pic2d%para2d%m_x1%eta_min
     xmin(2)=pic2d%para2d%m_x2%eta_min
-    
+   
     if(.not.associated(ful2d_head)) then
        print*, "error: the particles are not sorted by the rank of processes"
        stop
     end if
-    
+   
+!  i=0
+!      temp=>ful2d_head
+!    do while(associated(temp))
+!      if(associated(temp%next)) then
+!        temp=>temp%next
+!        i=i+1
+!      else
+!         exit
+!      end if
+!    end do
+!print*, "rank=",rank, "i=",i
+    pic2d%field2d%denf=0.0 
     temp=>ful2d_head
     do while(associated(temp))
       if(associated(temp%next)) then
@@ -81,6 +94,7 @@ contains
          pic2d%field2d%denf_ne,pic2d%field2d%denf_se,pic2d%field2d%denf_sw,pic2d%field2d%denf_nw)
     
 !    deallocate(pic2d%ful2d_head)
+
     nullify(temp)
   
     return

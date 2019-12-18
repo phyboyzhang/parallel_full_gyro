@@ -187,7 +187,7 @@ include "mpif.h"
     pic2d%para2d%N_points=20
     pic2d%para2d%iter_number=100
     pic2d%para2d%numcircle=8
-    pic2d%para2d%numparticle=200000
+    pic2d%para2d%numequ=200000
     pic2d%para2d%dtgy=1.0
     pic2d%para2d%num_time=15
     pic2d%para2d%boundary="double_per"

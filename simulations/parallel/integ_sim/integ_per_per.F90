@@ -57,7 +57,8 @@ use m_picutilities, only: singlepart_to_mesh, &
 
 use para_random_sample, only: para_accept_reject_gaussian1d_ful2d_per_per, &
                               para_accprej_gaus2d2v_fulgyro_unifield_per_per, &
-                              para_accprej_gaus1d2v_fulgyro_unifield_per_per
+                              para_accprej_gaus1d2v_fulgyro_unifield_per_per, &
+                              congru_accprej_flat2d2v_fulgyro_unifield_per_per
 
 use m_moveparticles, only: push_particle_among_box_ful2d_per_per
 use m_fieldsolver, only: solve_weight_of_field_among_processes, &
@@ -185,12 +186,12 @@ include "mpif.h"
 !!! initialize parameter_2d_sets
     pic2d%para2d%gxmin=(/0.0,0.0/)
     pic2d%para2d%gxmax=(/2.0*pi_,2.0*pi_/)
-    pic2d%para2d%N_points=50
+    pic2d%para2d%N_points=20
     pic2d%para2d%iter_number=10
     pic2d%para2d%numcircle=8
-    pic2d%para2d%numparticle=100000
+    pic2d%para2d%numequ=20000
     pic2d%para2d%dtgy=1.0
-    pic2d%para2d%num_time= 4 ! 15
+    pic2d%para2d%num_time= 16 ! 15
     pic2d%para2d%boundary="double_per"
     pic2d%para2d%geometry="cartesian"
     pic2d%para2d%mu=1.0
@@ -204,14 +205,14 @@ include "mpif.h"
     pic2d%para2d%mumin=0.0_f64
     pic2d%para2d%mumax=20._F64
     pic2d%para2d%mu_tail=1000
-    pic2d%para2d%mulast = 20
+    pic2d%para2d%mulast = 5
 !    pic2d%para2d%mu_num=39
     pic2d%para2d%gyroorder=1
     row=pic2d%para2d%row
     amp=0.001
     amp_eq=0.01
-    wave_one=5.0
-    wave_two=5.0
+    wave_one=3.0
+    wave_two=3.0
     num_time=pic2d%para2d%num_time
     cell_per_unit=pic2d%para2d%cell_per_unit
 
@@ -223,6 +224,9 @@ include "mpif.h"
     pic2d%para2d%numproc=NINT(sqrt(real(size,8)))
     numproc=pic2d%para2d%numproc 
     comm=pic2d%layout2d%collective%comm
+
+    pic2d%para2d%numper = pic2d%para2d%numequ/100
+
 !    mu_num=pic2d%para2d%mu_num
 
 
@@ -287,26 +291,25 @@ include "mpif.h"
      sum=pamearray%munum_partition(i)+sum
    end do
 
-if(rank==0) then
-!print*, "mu_num=",mu_num, "mutest=",mutest
-print*, "sum=",sum*size
-print*, "munum_partition=",pamearray%munum_partition
-print*, "mu_num=",pic2d%para2d%mu_num
-print*, "mu_nodes=",pamearray%mu_nodes
-print*, "mu_weights=",pamearray%mu_weights
-end if
+   if(rank==0) then
+   !print*, "mu_num=",mu_num, "mutest=",mutest
+   print*, "sum=",sum*size
+   print*, "munum_partition=",pamearray%munum_partition
+   print*, "mu_num=",pic2d%para2d%mu_num
+   print*, "mu_nodes=",pamearray%mu_nodes
+   print*, "mu_weights=",pamearray%mu_weights
+   end if
 
-if(rank==0) then
+   if(rank==0) then
    print*, "gboxmin(:,1)",pic2d%para2d%gboxmin(:,1)
 
    print*, "gboxmin(:,2)",pic2d%para2d%gboxmin(:,2)
-end if
+   end if
 
     num1=pic2d%layout2d%boxes(rank)%i_max-pic2d%layout2d%boxes(rank)%i_min+1
     num2=pic2d%layout2d%boxes(rank)%j_max-pic2d%layout2d%boxes(rank)%j_min+1                    
 
     call allocate_memory_to_field_2d_ful(pic2d%field2d,num1,num2,row)
-
     call allocate_memory_to_field_2d_gy(pic2d%field2d,num1,num2,row,mu_num)
     call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
 
@@ -333,31 +336,13 @@ end if
   endif
     
   !!! prepare the inital distribution of particles
-  call para_accprej_gaus1d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray)  
+!!  call para_accprej_gaus1d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray) 
+  call congru_accprej_flat2d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray) 
 
-if(rank==0) then
-print*, "#samping particles is finished."
-end if
-!if(rank==0) then
-!print*, "munum_partion=",pamearray%munum_partition
-!print*, "mu_nodes=",pamearray%mu_nodes
-!print*, "mu_weights=",pamearray%mu_weights
-!end if
+        if(rank==0) then
+        print*, "#samping particles is finished."
+        end if
 
-!  do i=1,mu_num
-!     gy2dmutmp(1)%ptr=>gy2dmu_head(1)%ptr
-!     do while(associated(gy2dmutmp(1)%ptr))
-!        if(.not.associated(gy2dmutmp(1)%ptr%next)) then
-!           exit
-!        else 
-!           print*, gy2dmutmp(1)%ptr%coords(1:3)
-!           gy2dmutmp(1)%ptr=>gy2dmutmp(1)%ptr%next
-!        end if
-!      end do
-!  end do
-  
-!print*, 2
-! !!! and store the equilibrium distirbution on the mesh
   call partition_density_to_grid_ful(ful2d_head,pic2d)
   call compute_equdensity_for_ful(pic2d)
   call compare_density_to_initnumber_gy(pic2d%field2d%denfeq, pic2d)
@@ -389,7 +374,7 @@ endif
    fileitemep_boris=100
    fileitemep_rk4  =200
    fileitemep_gy   =300
-   filepathep1="/home/qmlu/zsx163/parallel_full_gyro/run/ep_"
+   filepathep1="/home/qmlu/zsx163/parallel_full_gyro/data/ep_"
 
    filepathep_boris=trim(filepathep1)//"boris"//".txt"
    filepathep_rk4=trim(filepathep1)//"rk4"//".txt"
@@ -404,7 +389,7 @@ endif
 
 
 
-  do i=1,  100  !pic2d%para2d%iter_number
+  do i=1,  50  !pic2d%para2d%iter_number
     if(rank==0) then
       print*, "#iter_number=", i
     endif
@@ -423,16 +408,13 @@ endif
     call compute_gyrodensity_perturbation(rootdata,pic2d,pamearray)
 !print*, 4
     call solve_field_quasi_neutral(rank,rootdata,pic2d,pamearray)  !!! solve the electrostatic potential
-!if(rank==0.and.i==1) then
-!print*, pic2d%field2d%gep
-!endif
 
     call para_write_field_file_2d(pic2d%field2d%gep,fileitemep_gy,rootdata,pic2d)
  
      do j=1,pic2d%para2d%num_time
-       if(rank==0) then
-         print*, "#j=",j
-       endif
+!       if(rank==0) then
+!         print*, "#j=",j
+!       endif
        call solve_weight_of_field_among_processes(pic2d%field2d%ep,rootdata,pic2d, &
        pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n,&
        pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
@@ -442,11 +424,13 @@ endif
 
        call partition_density_to_grid_ful(ful2d_head,pic2d)
 
-       pic2d%field2d%denf=pic2d%field2d%denf-pic2d%field2d%denfeq
+ !      pic2d%field2d%denf=pic2d%field2d%denf-pic2d%field2d%denfeq
        call solve_field_ful(rootdata,pic2d,pamearray)
+!     if(rank==0) then
+!     print*, pic2d%field2d%ep
+!     endif
 
-       !call para_write_field_file_2d(pic2d%field2d%ep,fileitemep_boris,rootdata,pic2d)
-    end do
+   end do
        call para_write_field_file_2d(pic2d%field2d%ep,fileitemep_boris,rootdata,pic2d)
 
  end do
@@ -457,5 +441,8 @@ endif
 
  !!! and store the equilibrium distirbution on the mesh
     call MPI_FINALIZE(IERR) 
-  end program  integ_per_per
+    if(rank==0) then
+      print*, "#The simultion is finished."
+    endif  
+end program  integ_per_per
 

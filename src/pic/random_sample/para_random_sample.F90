@@ -23,7 +23,9 @@ module para_random_sample
   public:: para_accept_reject_gaussian1d_ful2d_per_per, &
            para_accprej_gaus2d2v_fulgyro_unifield_per_per, &
            para_accprej_gaus1d2v_fulgyro_unifield_per_per, &
-           congru_accprej_gaus1d2v_fulgyro_unifield_per_per
+           congru_accprej_gaus1d2v_fulgyro_unifield_per_per, &
+   !        congru_accprej_flatpert2d2v_fulgyro_unifield_per_per, &
+           congru_accprej_flat2d2v_fulgyro_unifield_per_per
   
 contains
 
@@ -60,7 +62,7 @@ contains
     end if
 
 !    call random_seed()       
-    do i=1,pic2d%para2d%numparticle
+    do i=1,pic2d%para2d%numequ
        pymax=1.0/sqrt(2.0*pi_)/sigma
        x=1.0
        py=0.0
@@ -157,7 +159,7 @@ contains
     end if
 
 !    call random_seed()       
-    do i=1,pic2d%para2d%numparticle
+    do i=1,pic2d%para2d%numequ
        x=1.0
        py=0.0
        do while(x.gt.py) 
@@ -589,8 +591,202 @@ contains
     deallocate(num,num_gy)
     deallocate(gy2dmutmp)
 !    deallocate(munum_partion)
-   end subroutine congru_accprej_gaus1d2v_fulgyro_unifield_per_per  
+  end subroutine congru_accprej_gaus1d2v_fulgyro_unifield_per_per  
 
+  subroutine congru_accprej_flat2d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray)
+    class(pic_para_total2d_base), pointer :: pic2d
+    class(parameters_array_2d), pointer, intent(in) :: pamearray
+    class(ful2d_node), pointer, intent(inout) :: ful2d_head
+    class(ful2dsend_node), dimension(:),pointer :: ful2dsend_head, fulcur
+!    class(gy2d_node), pointer, intent(inout) :: gy2d_head
+    class(gy2dmu_node), dimension(:), pointer,intent(inout) :: gy2dmu_head
+    class(gy2dsend_node), dimension(:), pointer :: gy2dsend_head,gycur
+    real8 :: mean(2),y(2),yf(2),py,pymax,x,x1,py1,gmin(2),gmax(2),mu
+    int4,dimension(:),pointer :: num
+    int4,dimension(:), pointer :: num_gy
+    class(ful2d_node), pointer :: ful2dtmp
+    class(gy2d_node), pointer :: gy2dtmp
+    class(gy2dmu_node), dimension(:), pointer :: gy2dmutmp
+!    int4, dimension(:), pointer :: munum_partion
+    real8 :: theta, sigma, coords(4),rho,mumin,mumax,vperp,tempt
+    real8 :: integ
+    int4 :: rank1,numcircle,size,rank,comm,mu_num
+    int4 :: ierr,i,j,k
+
+    int4 :: sum=0
+
+!!!!!! for congurence sampling
+    integer, parameter :: numsample=10000000
+    integer :: a
+    integer, pointer :: an
+    integer :: b
+    integer, pointer :: bn
+    integer :: c
+    integer :: error
+    integer :: id
+    integer :: h,m
+    integer :: k_hi
+    integer :: u
+    integer :: v
+    real(8) :: ratio
+
+    rank=pic2d%layout2d%collective%rank
+    size=pic2d%layout2d%collective%size
+    comm=pic2d%layout2d%collective%comm
+    numcircle=pic2d%para2d%numcircle
+    sigma=pic2d%para2d%sigma
+    tempt=pic2d%para2d%tempt
+    mu_num=pic2d%para2d%mu_num
+    allocate(num(0:size-1),num_gy(0:size-1))
+    allocate(fulcur(0:size-1),ful2dsend_head(0:size-1))
+    allocate(gy2dmutmp(1:mu_num))
+    allocate(an,bn)
+!    allocate(munum_partion(1:pic2d%para2d%mu_num))
+    do i=0,size-1
+       allocate(ful2dsend_head(i)%ptr)
+       fulcur(i)%ptr=>ful2dsend_head(i)%ptr
+    end do
+    ful2dtmp=>ful2d_head
+ 
+    do i=1,mu_num
+       allocate(gy2dmu_head(i)%ptr)
+       gy2dmutmp(i)%ptr=>gy2dmu_head(i)%ptr     
+    end do
+
+    num=0
+    gmin=pic2d%para2d%gxmin
+    gmax=pic2d%para2d%gxmax
+    mumin=pic2d%para2d%mumin
+    mumax=pic2d%para2d%mumax
+!    pymax=1.0/sqrt(2.0*pi_)/sigma
+    pymax=1.0
+    mean(1)=(pic2d%para2d%gxmax(1)+pic2d%para2d%gxmin(1))/2.0_f64
+    mean(2)=(pic2d%para2d%gxmax(2)+pic2d%para2d%gxmin(2))/2.0_f64      
+
+    if(.not.associated(ful2d_head)) then
+      print*, "ful2d_head is not allocated"
+      stop
+    end if
+
+!!!!!!+++++++++++++++++++++
+!!!! The begining of congurence sampling
+    a = 16807
+    b = 0
+    c = 2147483647
+   
+    k_hi = size*numsample
+
+    call lcrg_anbn(a, b, c, size,an, bn)
+
+    v = 12345
+    h = 1
+
+    do while(h.le.rank)
+      u=v
+      v=lcrg_evaluate(a,b,c,u)
+      h=h+1
+    end do
+
+    m=rank+size
+   
+    
+
+  do j=1,mu_num    
+    num_gy=0
+    allocate(gy2dsend_head(0:size-1))
+    allocate(gycur(0:size-1)) 
+    do k=0,size-1
+       allocate(gy2dsend_head(k)%ptr)
+       gycur(k)%ptr=>gy2dsend_head(k)%ptr
+    end do
+
+    do i=1, pamearray%munum_partition(j) 
+        u=v
+        v=lcrg_evaluate(an,bn,c,u)
+        m=m+size
+        if(m.ge.k_hi) then
+          print*, "#ERROR: the inital given sampling number is nesseary."
+          stop 
+        endif
+        ratio=real(v,8)/real(c,8)
+        y(2)=gmin(2)+(gmax(2)-gmin(2))*ratio    !generate_random_number()
+      
+        u=v
+        v=lcrg_evaluate(an,bn,c,u)
+        m=m+size
+        if(m.ge.k_hi) then
+          print*, "#ERROR: the inital given sampling number is nesseary."
+          stop
+        endif
+        ratio=real(v,8)/real(c,8)         
+        y(1)=gmin(1)+(gmax(1)-gmin(1))*ratio        
+
+        yf=y
+      
+        rank1=compute_process_of_point_per_per(y,pic2d%para2d%numproc,pic2d%para2d%gxmin, &
+                pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)
+
+        if(rank1==rank) then
+          gy2dmutmp(j)%ptr%coords(1:3)=(/y(1),y(2),pamearray%mu_nodes(j)/)
+          allocate(gy2dmutmp(j)%ptr%next)
+          gy2dmutmp(j)%ptr=>gy2dmutmp(j)%ptr%next
+          num_gy(rank)=num_gy(rank)+1
+
+        else 
+
+          gycur(rank1)%ptr%coords(1:3)=(/y(1),y(2),pamearray%mu_nodes(j)/)
+          allocate(gycur(rank1)%ptr%next)
+          gycur(rank1)%ptr=>gycur(rank1)%ptr%next
+          num_gy(rank1)=num_gy(rank1)+1
+        end if
+
+ 
+        rho=sqrt(2._f64*pamearray%mu_nodes(j))
+        do k=0,numcircle-1
+
+           theta=real(k,8)*2.0_f64*pi_/real(numcircle,8)   
+           coords(1)=yf(1)+rho*cos(theta)
+           coords(2)=yf(2)+rho*sin(theta)      
+           coords(3)=rho*cos(theta+pi_/2.0_f64)
+           coords(4)=rho*sin(theta+pi_/2.0_f64) 
+!           call coordinates_pointoutbound_per_per(coords(1:2),pic2d) 
+           rank1=compute_process_of_point_per_per(coords(1:2),pic2d%para2d%numproc,pic2d%para2d%gxmin, &
+               pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)           
+
+          if(rank1==rank) then
+            ful2dtmp%coords(1:4)=coords(1:4)
+            allocate(ful2dtmp%next)
+            ful2dtmp=>ful2dtmp%next
+            num(rank)=num(rank)+1           
+          else
+            fulcur(rank1)%ptr%coords(1)=coords(1)
+            fulcur(rank1)%ptr%coords(2)=coords(2)
+            fulcur(rank1)%ptr%coords(3)=coords(3)
+            fulcur(rank1)%ptr%coords(4)=coords(4)
+            num(rank1)=num(rank1)+1 
+            allocate(fulcur(rank1)%ptr%next)
+            fulcur(rank1)%ptr=>fulcur(rank1)%ptr%next
+          end if
+        end do
+
+    end do
+
+
+    call mpi2d_alltoallv_send_particle_2d_gy(gy2dmu_head,gy2dsend_head,num_gy,j,pic2d)
+
+    deallocate(gy2dsend_head,gycur)
+
+    end do  !! end loop denoted by j
+ 
+    call mpi2d_alltoallv_send_particle_2d(ful2d_head,ful2dsend_head,num,pic2d)
+
+    deallocate(ful2dsend_head)
+ 
+   
+    deallocate(num,num_gy)
+    deallocate(gy2dmutmp)
+!    deallocate(munum_partion)
+   end subroutine congru_accprej_flat2d2v_fulgyro_unifield_per_per  
 
 
 end module para_random_sample

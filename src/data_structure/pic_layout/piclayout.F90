@@ -33,7 +33,8 @@ module piclayout
      real8,pointer :: gboxmin(:,:),gboxmax(:,:)  ! global boundary of x1 and x2 for each process
      real8 :: sigma    ! the variance of the gaussian distribution
      character(99) :: geometry, boundary
-     int8  :: numparticle  ! number of particles for sampling
+     int8  :: numequ  ! number of particles for equilibrium sampling
+     int8  :: numper       ! numbre of particles for the perturbation
      int8  :: numcircle    ! number of particles on larmor circle
                            ! homogeneously distributed on circle
      
@@ -42,7 +43,7 @@ module piclayout
      real8 :: mumin,mumax
      int4 :: mu_scheme
      int4 :: mu_tail    !! The number of particles located at the last mu number 
-     real8 :: mulast    !! The number of the last mu number which is accepted.
+     int4 :: mulast    !! The number of the last mu number which is accepted.
      real8 :: tempt
 
      int4  :: row   !!! left,right,up,down, the number of lines for the communication for interpolation

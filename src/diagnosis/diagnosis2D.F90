@@ -32,7 +32,7 @@ contains
          pic2d%para2d%numproc,pic2d%layout2d)    
     sum=0.0
     if(rank==0) then
-      do i=1,global_sz(1)*global_sz(2)
+     do i=1,global_sz(1)*global_sz(2)
         sum=sum+buff(i)
       end do
     end if

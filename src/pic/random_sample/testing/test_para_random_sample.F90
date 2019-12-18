@@ -58,7 +58,8 @@ use m_picutilities, only: singlepart_to_mesh, &
 use para_random_sample, only: para_accept_reject_gaussian1d_ful2d_per_per, &
                               para_accprej_gaus2d2v_fulgyro_unifield_per_per, &
                               para_accprej_gaus1d2v_fulgyro_unifield_per_per, &
-                              congru_accprej_gaus1d2v_fulgyro_unifield_per_per
+                              congru_accprej_gaus1d2v_fulgyro_unifield_per_per, &
+                              congru_accprej_flat2d2v_fulgyro_unifield_per_per
 
 use m_moveparticles, only: push_particle_among_box_ful2d_per_per
 use m_fieldsolver, only: solve_weight_of_field_among_processes, &
@@ -188,7 +189,7 @@ include "mpif.h"
     pic2d%para2d%N_points=50
     pic2d%para2d%iter_number=100
     pic2d%para2d%numcircle=8
-    pic2d%para2d%numparticle=100000
+    pic2d%para2d%numequ=100000
     pic2d%para2d%dtgy=1.0
     pic2d%para2d%num_time=15
     pic2d%para2d%boundary="double_per"
@@ -199,12 +200,12 @@ include "mpif.h"
     pic2d%para2d%dtful=pic2d%para2d%dtgy/real(pic2d%para2d%num_time,8)
     pic2d%para2d%mu_scheme = 1
     !!! particle in cell part
-    pic2d%para2d%sigma = 25.0
+    pic2d%para2d%sigma = 10.0
     pic2d%para2d%tempt = 1.0
     pic2d%para2d%mumin=0.0_f64
     pic2d%para2d%mumax=4._F64
     pic2d%para2d%mu_tail=500
-    pic2d%para2d%mulast = 10
+    pic2d%para2d%mulast = 50
 !    pic2d%para2d%mu_num=39
     pic2d%para2d%gyroorder=1
     row=pic2d%para2d%row
@@ -321,7 +322,7 @@ end if
 if(rank==0) then
   print*, "#the sampling of particles begins"
 endif
-  call congru_accprej_gaus1d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray)  
+  call congru_accprej_flat2d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray)  
 
 !if(rank==0) then
 !print*, "munum_partion=",pamearray%munum_partition

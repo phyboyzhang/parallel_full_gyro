@@ -83,21 +83,62 @@ contains
   field2d%ep_e(num1,row),field2d%ep_n(row,num2),field2d%ep_s(row,num2), &
   field2d%ep_sw(row,row),field2d%ep_se(row,row),field2d%ep_nw(row,row),field2d%ep_ne(row,row),stat=ierr)
 
+  field2d%ep=0.0 
+  field2d%ep_w=0.0
+  field2d%ep_e=0.0
+  field2d%ep_n=0.0
+  field2d%ep_s=0.0
+  field2d%ep_sw=0.0
+  field2d%ep_se=0.0
+  field2d%ep_nw=0.0
+  field2d%ep_ne=0.0
+
    allocate(field2d%ep_weight(num1,num2),field2d%epwg_w(num1,row),&
   field2d%epwg_e(num1,row),field2d%epwg_n(row,num2),field2d%epwg_s(row,num2),&
   field2d%epwg_sw(row,row),field2d%epwg_se(row,row),field2d%epwg_nw(row,row),&
   field2d%epwg_ne(row,row), stat=ierr)
+
+  field2d%ep_weight=0.0
+  field2d%epwg_w=0.0 
+  field2d%epwg_e=0.0
+  field2d%epwg_n=0.0
+  field2d%epwg_s=0.0
+  field2d%epwg_sw=0.0
+  field2d%epwg_se=0.0
+  field2d%epwg_nw=0.0
+  field2d%epwg_ne=0.0  
+
 
      allocate(field2d%denf(num1,num2),field2d%denf_w(num1,row),&
   field2d%denf_e(num1,row),field2d%denf_n(row,num2),field2d%denf_s(row,num2), &
   field2d%denf_sw(row,row),field2d%denf_se(row,row),field2d%denf_nw(row,row), &
   field2d%denf_ne(row,row), stat=ierr)
 
+  field2d%denf=0.0
+  field2d%denf_w=0.0
+  field2d%denf_e=0.0
+  field2d%denf_n=0.0
+  field2d%denf_s=0.0
+  field2d%denf_sw=0.0
+  field2d%denf_se=0.0
+  field2d%denf_nw=0.0
+  field2d%denf_ne=0.0
+ 
+
      allocate(field2d%denfeq(num1,num2),field2d%denfeq_w(num1,row), &
   field2d%denfeq_e(num1,row),field2d%denfeq_n(row,num2),field2d%denfeq_s(row,num2), &
   field2d%denfeq_sw(row,row),field2d%denfeq_se(row,row),field2d%denfeq_nw(row,row), &
   field2d%denfeq_ne(row,row), stat=ierr)
 
+  field2d%denfeq=0.0
+  field2d%denfeq_w=0.0
+  field2d%denfeq_e=0.0
+  field2d%denfeq_n=0.0
+  field2d%denfeq_s=0.0
+  field2d%denfeq_sw=0.0
+  field2d%denfeq_se=0.0
+  field2d%denfeq_nw=0.0
+  field2d%denfeq_ne=0.0
 
   end subroutine allocate_memory_to_field_2d_ful
 
@@ -115,70 +156,160 @@ contains
    allocate(field2d%gep(num1,num2),field2d%gep_w(num1,row), &
   field2d%gep_e(num1,row),field2d%gep_n(row,num2),field2d%gep_s(row,num2), &
   field2d%gep_sw(row,row),field2d%gep_se(row,row),field2d%gep_nw(row,row), &
-  field2d%ep_ne(row,row),stat=ierr)
+  field2d%gep_ne(row,row),stat=ierr)
+
+  field2d%gep=0.0
+  field2d%gep_w=0.0
+  field2d%gep_e=0.0
+  field2d%gep_n=0.0
+  field2d%gep_s=0.0
+  field2d%gep_sw=0.0
+  field2d%gep_se=0.0
+  field2d%gep_nw=0.0
+  field2d%gep_ne=0.0   
+
 
    allocate(field2d%gep_weight(num1,num2),field2d%gepwg_w(num1,row), &
   field2d%gepwg_e(num1,row),field2d%gepwg_n(row,num2),field2d%gepwg_s(row,num2),&
   field2d%gepwg_sw(row,row),field2d%gepwg_se(row,row),field2d%gepwg_nw(row,row),&
   field2d%gepwg_ne(row,row), stat=ierr)
 
+  field2d%gep_weight=0.0
+  field2d%gepwg_w=0.0
+  field2d%gepwg_e=0.0
+  field2d%gepwg_n=0.0
+  field2d%gepwg_s=0.0
+  field2d%gepwg_sw=0.0
+  field2d%gepwg_se=0.0  
+  field2d%gepwg_nw=0.0
+  field2d%gepwg_ne=0.0
+ 
+
    allocate(field2d%epgyro(mu_num,num1,num2),field2d%epgy_w(mu_num,num1,row), &
   field2d%epgy_e(mu_num,num1,row),field2d%epgy_n(mu_num,row,num2),field2d%epgy_s(mu_num,row,num2), &
   field2d%epgy_sw(mu_num,row,row),field2d%epgy_se(mu_num,row,row),field2d%epgy_nw(mu_num,row,row), &
   field2d%epgy_ne(mu_num,row,row),stat=ierr)
+
+  field2d%epgyro=0.0
+  field2d%epgy_w=0.0
+  field2d%epgy_e=0.0
+  field2d%epgy_n=0.0
+  field2d%epgy_s=0.0
+  field2d%epgy_sw=0.0
+  field2d%epgy_se=0.0
+  field2d%epgy_nw=0.0
+  field2d%epgy_ne=0.0
 
    allocate(field2d%epgy_weight(mu_num,num1,num2),field2d%epgywg_w(mu_num,num1,row), &
   field2d%epgywg_e(mu_num,num1,row),field2d%epgywg_n(mu_num,row,num2),field2d%epgywg_s(mu_num,row,num2), &
   field2d%epgywg_sw(mu_num,row,row),field2d%epgywg_se(mu_num,row,row),field2d%epgywg_nw(mu_num,row,row), &
   field2d%epgywg_ne(mu_num,row,row),stat=ierr)
 
+  field2d%epgy_weight=0.0
+  field2d%epgywg_w=0.0
+  field2d%epgywg_e=0.0
+  field2d%epgywg_n=0.0
+  field2d%epgywg_s=0.0
+  field2d%epgywg_sw=0.0
+  field2d%epgywg_se=0.0
+  field2d%epgywg_nw=0.0
+  field2d%epgywg_ne=0.0
+
+
      allocate(field2d%deng(mu_num,num1,num2),field2d%deng_w(mu_num,num1,row),&
   field2d%deng_e(mu_num,num1,row),field2d%deng_n(mu_num,row,num2),field2d%deng_s(mu_num,row,num2), &
   field2d%deng_sw(mu_num,row,row),field2d%deng_se(mu_num,row,row),field2d%deng_nw(mu_num,row,row), &
   field2d%deng_ne(mu_num,row,row), stat=ierr)
+
+  field2d%deng=0.0
+  field2d%deng_w=0.0
+  field2d%deng_e=0.0
+  field2d%deng_n=0.0
+  field2d%deng_s=0.0
+  field2d%deng_sw=0.0
+  field2d%deng_se=0.0
+  field2d%deng_nw=0.0
+  field2d%deng_ne=0.0
 
      allocate(field2d%dengeq(mu_num,num1,num2),field2d%dengeq_w(mu_num,num1,row), &
   field2d%dengeq_e(mu_num,num1,row),field2d%dengeq_n(mu_num,row,num2),field2d%dengeq_s(mu_num,row,num2), &
   field2d%dengeq_sw(mu_num,row,row),field2d%dengeq_se(mu_num,row,row),field2d%dengeq_nw(mu_num,row,row), &
   field2d%dengeq_ne(mu_num,row,row), stat=ierr)
 
+     field2d%dengeq=0.0
+     field2d%dengeq_w=0.0
+     field2d%dengeq_e=0.0
+     field2d%dengeq_n=0.0
+  field2d%dengeq_s=0.0
+  field2d%dengeq_sw=0.0
+  field2d%dengeq_se=0.0
+  field2d%dengeq_nw=0.0 
+  field2d%dengeq_ne=0.0
+
      allocate(field2d%dengeq_weight(mu_num,num1,num2),field2d%dengeqwg_w(mu_num,num1,row), &
   field2d%dengeqwg_e(mu_num,num1,row),field2d%dengeqwg_n(mu_num,row,num2),field2d%dengeqwg_s(mu_num,row,num2), &
   field2d%dengeqwg_sw(mu_num,row,row),field2d%dengeqwg_se(mu_num,row,row),field2d%dengeqwg_nw(mu_num,row,row), &
   field2d%dengeqwg_ne(mu_num,row,row), stat=ierr)
+     
+  field2d%dengeq_weight=0.0
+  field2d%dengeqwg_w=0.0
+  field2d%dengeqwg_e=0.0
+  field2d%dengeqwg_n=0.0
+  field2d%dengeqwg_s=0.0
+  field2d%dengeqwg_sw=0.0
+  field2d%dengeqwg_se=0.0
+  field2d%dengeqwg_nw=0.0
+  field2d%dengeqwg_ne=0.0 
 
      allocate(field2d%deng_weight(mu_num,num1,num2),field2d%dengwg_w(mu_num,num1,row), &
   field2d%dengwg_e(mu_num,num1,row),field2d%dengwg_n(mu_num,row,num2),field2d%dengwg_s(mu_num,row,num2), &
   field2d%dengwg_sw(mu_num,row,row),field2d%dengwg_se(mu_num,row,row),field2d%dengwg_nw(mu_num,row,row), &
   field2d%dengwg_ne(mu_num,row,row), stat=ierr)
 
-
+  field2d%deng_weight=0.0
+  field2d%dengwg_w=0.0
+  field2d%dengwg_e=0.0
+  field2d%dengwg_n=0.0
+  field2d%dengwg_s=0.0
+  field2d%dengwg_sw=0.0
+  field2d%dengwg_se=0.0
+  field2d%dengwg_nw=0.0
+  field2d%dengwg_ne=0.0
 
      allocate(field2d%dengtot(num1,num2),field2d%dengtot_w(num1,row), &
   field2d%dengtot_e(num1,row),field2d%dengtot_n(row,num2),field2d%dengtot_s(row,num2), &
   field2d%dengtot_sw(row,row),field2d%dengtot_se(row,row),field2d%dengtot_nw(row,row), &
   field2d%dengtot_ne(row,row), stat=ierr)
 
+  field2d%dengtot=0.0
+  field2d%dengtot_w=0.0
+  field2d%dengtot_e=0.0
+  field2d%dengtot_n=0.0
+  field2d%dengtot_s=0.0
+  field2d%dengtot_sw=0.0
+  field2d%dengtot_se=0.0
+  field2d%dengtot_nw=0.0
+  field2d%dengtot_ne=0.0
+
      allocate(field2d%dengeqtot(num1,num2), stat=ierr)
+  
+  field2d%dengeqtot=0.0
 
-
-
-     allocate(field2d%epgyro(mu_num,num1,num2),field2d%epgy_w(mu_num,num1,row), &
-  field2d%epgy_e(mu_num,num1,row),field2d%epgy_n(mu_num,row,num2),field2d%epgy_s(mu_num,row,num2), &
-  field2d%epgy_sw(mu_num,row,row),field2d%epgy_se(mu_num,row,row),field2d%epgy_nw(mu_num,row,row), &
-  field2d%epgy_ne(mu_num,row,row), stat=ierr)
-
-     allocate(field2d%epgy_weight(mu_num,num1,num2),field2d%epgywg_w(mu_num,num1,row), &
-  field2d%epgywg_e(mu_num,num1,row),field2d%epgywg_n(mu_num,row,num2),field2d%epgywg_s(mu_num,row,num2), &
-  field2d%epgywg_sw(mu_num,row,row),field2d%epgywg_se(mu_num,row,row),field2d%epgywg_nw(mu_num,row,row), &
-  field2d%epgywg_ne(mu_num,row,row), stat=ierr)
 
      allocate(field2d%epgysq_weight(num1,num2),field2d%epgysqwg_w(num1,row), &
   field2d%epgysqwg_e(num1,row),field2d%epgysqwg_n(row,num2),field2d%epgysqwg_s(row,num2), &
   field2d%epgysqwg_sw(row,row),field2d%epgysqwg_se(row,row),field2d%epgysqwg_nw(row,row), &
   field2d%epgysqwg_ne(row,row), stat=ierr)
 
-
+  field2d%epgysq_weight=0.0
+  field2d%epgysqwg_w=0.0
+  field2d%epgysqwg_e=0.0
+  field2d%epgysqwg_n=0.0
+  field2d%epgysqwg_s=0.0
+  field2d%epgysqwg_sw=0.0
+  field2d%epgysqwg_se=0.0
+  field2d%epgysqwg_nw=0.0
+  field2d%epgysqwg_ne=0.0
 
   end subroutine allocate_memory_to_field_2d_gy
 
@@ -314,7 +445,7 @@ contains
        end do
 
        do i=1,mutest
-          munum_partition(i)=NINT(real(pic2d%para2d%numparticle,8)*exp(-mu_nodes(i)/ &
+          munum_partition(i)=NINT(real(pic2d%para2d%numequ,8)*exp(-mu_nodes(i)/ &
              pic2d%para2d%tempt)*mu_weights(i)/integ)
        end do
      end do

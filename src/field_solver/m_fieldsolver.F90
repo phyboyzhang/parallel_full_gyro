@@ -83,14 +83,10 @@ contains
        call gather_field_to_rootprocess_per_per(density,buffer,rank, &
            sizeone,boxindex,pic2d%para2d%numproc,pic2d%layout2d)
 
-!if(rank==0) then
-!print*, "prematrix=",rootdata%prematrix(1:6,:)
-!
-!print*, "density=", density
-!endif
+
        if(rank==0) then
           rootdata%field=matmul(rootdata%prematrix,density) 
-      end if 
+       end if 
 
 
        call scatter_field_from_rootprocess_per_per(rootdata%field,pic2d%field2d%gep,sizeone, &
@@ -103,13 +99,21 @@ contains
        class(root_precompute_data), pointer, intent(inout) :: rootdata 
        class(pic_para_total2d_base), pointer, intent(inout) :: pic2d
        class(parameters_array_2d), pointer, intent(in) :: pamearray
-       int4 :: i,j,num1,num2
+       int4 :: i,j,num1,num2,rank
  
+       rank=pic2d%layout2d%collective%rank
        num1=size(pic2d%field2d%denf,1)
        num2=size(pic2d%field2d%denf,2)
-       do i=1,num1
+ 
+       pic2d%field2d%denf=pic2d%field2d%denf-pic2d%field2d%denfeq
+!       if(rank==0) then
+!         print*, "denf=", pic2d%field2d%denf
+!         print*, 
+!         print*, "denfeq=", pic2d%field2d%denfeq 
+!       endif
+       do i= 1,num1
          do j=1,num2
-            pic2d%field2d%denf(i,j)=pic2d%field2d%denf(i,j)*pamearray%temp_e(i,j)/ &
+            pic2d%field2d%ep(i,j)=pic2d%field2d%denf(i,j)*pamearray%temp_e(i,j)/ &
                                     pic2d%field2d%denfeq(i,j) 
          end do
        enddo
