@@ -445,7 +445,7 @@ contains
        end do
 
        do i=1,mutest
-          munum_partition(i)=NINT(real(pic2d%para2d%numequ,8)*exp(-mu_nodes(i)/ &
+          munum_partition(i)=NINT(real(pic2d%para2d%numparticles,8)*exp(-mu_nodes(i)/ &
              pic2d%para2d%tempt)*mu_weights(i)/integ)
        end do
      end do

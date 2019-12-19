@@ -59,14 +59,14 @@ use para_random_sample, only: para_accept_reject_gaussian1d_ful2d_per_per, &
                               para_accprej_gaus2d2v_fulgyro_unifield_per_per, &
                               para_accprej_gaus1d2v_fulgyro_unifield_per_per, &
                               congru_accprej_gaus1d2v_fulgyro_unifield_per_per, &
-                              congru_accprej_flat2d2v_fulgyro_unifield_per_per
+                              congru_accprej_trig2d2v_fulgyro_unifield_per_per
 
 use m_moveparticles, only: push_particle_among_box_ful2d_per_per
 use m_fieldsolver, only: solve_weight_of_field_among_processes, &
                          solve_field_quasi_neutral, &
                          solve_field_ful, &
                          solve_gyfieldweight_from_field, &
-                         compute_equdensity_for_ful, &
+                         compute_equdensity, &
                          compute_equdensity_for_gy, &
                          compute_gyrodensity_perturbation
 
@@ -171,7 +171,7 @@ include "mpif.h"
     real8, dimension(:), pointer :: mu_nodes,mu_weights
     int4, dimension(:), pointer :: munum_partition
     real8 :: integ
-    int4 :: sum
+    int4 :: sum, ND(2)
 
 !!!! store density
    character(100) :: filepathgy,filepathful
@@ -189,14 +189,14 @@ include "mpif.h"
     pic2d%para2d%N_points=50
     pic2d%para2d%iter_number=100
     pic2d%para2d%numcircle=8
-    pic2d%para2d%numequ=100000
+    pic2d%para2d%numparticles=200000
     pic2d%para2d%dtgy=1.0
     pic2d%para2d%num_time=15
     pic2d%para2d%boundary="double_per"
     pic2d%para2d%geometry="cartesian"
     pic2d%para2d%mu=1.0
     pic2d%para2d%row=3
-    pic2d%para2d%cell_per_unit=(/30,30/) 
+    pic2d%para2d%cell_per_unit=(/15,15/) 
     pic2d%para2d%dtful=pic2d%para2d%dtgy/real(pic2d%para2d%num_time,8)
     pic2d%para2d%mu_scheme = 1
     !!! particle in cell part
@@ -208,8 +208,11 @@ include "mpif.h"
     pic2d%para2d%mulast = 50
 !    pic2d%para2d%mu_num=39
     pic2d%para2d%gyroorder=1
+    pic2d%para2d%amp = 0.05
+    pic2d%para2d%waveone = 2.0
+    pic2d%para2d%wavetwo = 2.0
     row=pic2d%para2d%row
-    amp=0.02
+    amp=0.1
     amp_eq=0.0
     wave_one=20.0
     wave_two=20.0
@@ -322,7 +325,7 @@ end if
 if(rank==0) then
   print*, "#the sampling of particles begins"
 endif
-  call congru_accprej_flat2d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray)  
+  call congru_accprej_trig2d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray)  
 
 !if(rank==0) then
 !print*, "munum_partion=",pamearray%munum_partition
@@ -345,10 +348,26 @@ endif
 !print*, 2
 ! !!! and store the equilibrium distirbution on the mesh
   call partition_density_to_grid_ful(ful2d_head,pic2d)
-  call compute_equdensity_for_ful(pic2d)
-  call compare_density_to_initnumber_gy(pic2d%field2d%denfeq, pic2d)
 
+  call compute_equdensity(sum*pic2d%para2d%numcircle*size,pic2d%field2d%denfeq, &
+       pic2d%field2d%denfeq_e,pic2d%field2d%denfeq_s,pic2d%field2d%denfeq_w, &
+       pic2d%field2d%denfeq_n,pic2d%field2d%denfeq_ne,pic2d%field2d%denfeq_se, &
+       pic2d%field2d%denfeq_sw,pic2d%field2d%denfeq_nw,pic2d)
+  call compare_density_to_initnumber_gy(pic2d%field2d%denf, pic2d)
 
+  ND(1)=pic2d%para2d%m_x1%nodes
+  ND(2)=pic2d%para2d%m_x2%nodes
+!if(rank==2.or.rank==4) then
+!print*, "fultot=", sum*pic2d%para2d%numcircle*size
+  do j=1,ND(2)
+    DO i=1, ND(1)
+! print*, pic2d%field2d%denf(i,j),pic2d%field2d%denfeq(i,j)
+      pic2d%field2d%denf(i,j)=(pic2d%field2d%denf(i,j)-pic2d%field2d%denfeq(i,j))/pic2d%field2d%denfeq(i,j)
+    ENDDO
+  ENDDO
+!endif
+
+ 
 !print*, 3
  !!! and store the equilibrium distirbution on the mesh
   call partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d)
@@ -360,7 +379,7 @@ endif
   call compare_density_to_initnumber_gy(pic2d%field2d%dengeqtot, pic2d)
 
      filepathgy="/home/qmlu/zsx163/parallel_full_gyro/run/orbit/densgy.txt"
-     filepathful="/home/qmlu/zsx163/parallel_full_gyro/run/orbit/densful.txt"
+     filepathful="/home/qmlu/zsx163/parallel_full_gyro/data/den_ful.txt"
 
      fileitemful=10
      fileitemgy =20
@@ -368,9 +387,9 @@ endif
      call open_file(fileitemful,filepathful,rank)
      call open_file(fileitemgy,filepathgy,rank)  
    
-     call para_write_field_file_2d(pic2d%field2d%denfeq,fileitemful,rootdata,pic2d)
+     call para_write_field_file_2d(pic2d%field2d%denf,fileitemful,rootdata,pic2d)
  
-     call para_write_field_file_2d(pic2d%field2d%dengeqtot,fileitemgy,rootdata,pic2d)
+ !    call para_write_field_file_2d(pic2d%field2d%deng,fileitemgy,rootdata,pic2d)
   
      call close_file(fileitemful,rank)
      call close_file(fileitemgy, rank)

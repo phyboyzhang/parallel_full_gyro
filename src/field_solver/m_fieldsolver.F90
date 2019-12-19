@@ -8,15 +8,17 @@ use m_mpilayout, only: get_layout_2d_box_index
 use m_parautilities, only: gather_field_to_rootprocess_per_per, &
                            mpi2d_alltoallv_box_per_per, &
                            scatter_field_from_rootprocess_per_per 
+use paradata_utilities, only: coords_from_localind
 use para_gyroaverage_2d_one, only: para_compute_gyroaverage_mesh_field, &
                                    para_compute_gyroaverage_field_on_mesh
+use field_initialize, only: test_trigonfun
 implicit none
 
 public :: solve_weight_of_field_among_processes, &
           solve_field_quasi_neutral, &
           solve_gyfieldweight_from_field, &
           compute_gyrodensity_perturbation, &
-          compute_equdensity_for_ful, &
+          compute_equdensity, &
           compute_equdensity_for_gy, &
           solve_field_ful
 contains
@@ -198,19 +200,49 @@ contains
      end subroutine
  
 
-     subroutine compute_equdensity_for_ful(pic2d)
+     subroutine compute_equdensity(numparticles,box,re,rs,rw,rn,rne,rse,rsw,rnw,pic2d)
        class(pic_para_total2d_base), pointer, intent(inout) :: pic2d
-       
-       pic2d%field2d%denfeq=pic2d%field2d%denf
-       pic2d%field2d%denfeq_e=pic2d%field2d%denf_e
-       pic2d%field2d%denfeq_s=pic2d%field2d%denf_s
-       pic2d%field2d%denfeq_w=pic2d%field2d%denf_w
-       pic2d%field2d%denfeq_n=pic2d%field2d%denf_n
-       pic2d%field2d%denfeq_ne=pic2d%field2d%denf_ne
-       pic2d%field2d%denfeq_se=pic2d%field2d%denf_se
-       pic2d%field2d%denfeq_nw=pic2d%field2d%denf_nw
-       pic2d%field2d%denfeq_sw=pic2d%field2d%denf_sw 
+       real(8), dimension(:,:),pointer :: box,re,rs,rw,rn,rne,rse,rsw,rnw
+       int4, intent(in) :: numparticles
+       real8 :: gxmin(2), delta(2),coords(2)
+       int4 :: ND(2),rank,comm,boxindex(4),row,numproc(2),globind(2)
+       int4 :: i,j     
+       real8 :: summ=0.0
+ 
+       comm=pic2d%layout2d%collective%comm
+       rank=pic2d%layout2d%collective%rank
+       delta(1)=pic2d%para2d%m_x1%delta_eta
+       delta(2)=pic2d%para2d%m_x2%delta_eta
+       ND(1)=pic2d%para2d%m_x1%nodes
+       ND(2)=pic2d%para2d%m_x2%nodes
+       globind(1)=pic2d%layout2d%global_sz1
+       globind(2)=pic2d%layout2d%global_sz2
+       gxmin=pic2d%para2d%gxmin
+       row=pic2d%para2d%row
+       numproc=NINT(sqrt(real(pic2d%layout2d%collective%size,8)))
+      
+        
+       call get_layout_2d_box_index(pic2d%layout2d, rank,boxindex)
+       do j=1,globind(2)
+         coords(2)=gxmin(2)+delta(2)*real(j-1,8)
+         do i=1,globind(1)
+           coords(1)=gxmin(1)+delta(1)*real(i-1,8)
+           coords=coords_from_localind((/i,j/),rank,pic2d%para2d%gboxmin,delta)
+           summ=summ+test_trigonfun(coords(1),pic2d%para2d%amp,pic2d%para2d%waveone,pic2d%para2d%wavetwo)*delta(1)*delta(2)
+         enddo
+       enddo
 
+       do j=1,ND(2)
+         do i=1,ND(1)
+           coords=coords_from_localind((/i,j/),rank,pic2d%para2d%gboxmin,delta)           
+           box(i,j)=test_trigonfun(coords(1),pic2d%para2d%amp,pic2d%para2d%waveone,pic2d%para2d%wavetwo)*delta(1) &
+                    *delta(2)/summ*real(numparticles,8)
+         end do
+       enddo
+       
+       call mpi2d_alltoallv_box_per_per(row,comm,rank,numproc, &
+                                        box,rw,re,rn,rs,rsw,rse,rnw,rne,boxindex)
+       
      end subroutine
 
      subroutine compute_gyrodensity_perturbation(rootdata,pic2d,pamearray)

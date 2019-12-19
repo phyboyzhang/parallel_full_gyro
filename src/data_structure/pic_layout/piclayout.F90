@@ -33,9 +33,9 @@ module piclayout
      real8,pointer :: gboxmin(:,:),gboxmax(:,:)  ! global boundary of x1 and x2 for each process
      real8 :: sigma    ! the variance of the gaussian distribution
      character(99) :: geometry, boundary
-     int8  :: numequ  ! number of particles for equilibrium sampling
-     int8  :: numper       ! numbre of particles for the perturbation
-     int8  :: numcircle    ! number of particles on larmor circle
+     int4  :: numparticles  ! number of particles 
+     int4  :: numper       ! numbre of particles for the perturbation
+     int4  :: numcircle    ! number of particles on larmor circle
                            ! homogeneously distributed on circle
      
      real8 :: mu
@@ -53,6 +53,9 @@ module piclayout
      int4  :: iter_number
      int4  :: gyroorder   ! gyroorder=1, the fisrt order; gyroorder=2, the 2nd order 
 
+     real8 :: amp
+     real8 :: ampone,amptwo
+     real8 :: waveone,wavetwo
 !     real8, dimension(:),pointer :: mu_nodes,mu_weights
 !     real8, dimension(:,:),pointer :: temp_i,temp_e
   end type parameters_set_2d

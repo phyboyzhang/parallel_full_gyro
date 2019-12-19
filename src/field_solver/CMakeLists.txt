@@ -5,4 +5,4 @@
 
 ADD_LIBRARY(fieldsolver STATIC m_fieldsolver.F90)
 Target_Link_Libraries(fieldsolver mpilayout interpolation piclayout
-                                  parautilities paradata_type)
+                                  parautilities paradata_type field_test)

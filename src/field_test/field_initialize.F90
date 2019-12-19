@@ -16,7 +16,8 @@ module field_initialize
        efield2d_anal, &
        compute_field_2d_mesh, &
        magfield_2d_interpolation_point, &
-       para_initialize_field_2d_mesh
+       para_initialize_field_2d_mesh, &
+       test_trigonfun
 
 contains
 
@@ -323,7 +324,13 @@ contains
   end subroutine para_initialize_field_2d_mesh
 
 
+   function test_trigonfun(y,amp,waveone,wavetwo)
+     real8,intent(in) :: amp,waveone,wavetwo,y(2)
+     real8 :: test_trigonfun
 
+     test_trigonfun=1+amp*sin(waveone*y(1))+amp*cos(wavetwo*y(2))
+
+   end function test_trigonfun
 
  
 

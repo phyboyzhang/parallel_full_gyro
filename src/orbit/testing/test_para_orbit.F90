@@ -167,7 +167,7 @@ include "mpif.h"
     pic2d%para2d%cell_per_unit=(/10,10/) 
     pic2d%para2d%dtful=pic2d%para2d%dtgy/real(pic2d%para2d%num_time,8)
     !!! particle in cell part
-    pic2d%para2d%numequ=5000
+    pic2d%para2d%numparticles=5000
     pic2d%para2d%numcircle = 3
     pic2d%para2d%sigma = 1.0
     pic2d%para2d%tempt = 1.0
