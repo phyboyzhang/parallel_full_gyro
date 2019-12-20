@@ -264,12 +264,12 @@ contains
       int4,intent(in) :: numleft, numgr,numtot    
       int4, dimension(:), pointer,intent(in) :: rdispls,rcounts
       real8, dimension(:) :: outarray
-      int4 :: root,size,comm,rank
+      int4 :: root,sizeone,comm,rank
       real8, dimension(:), pointer :: rbuf, sbuf
       class(tp_ful2d_node), pointer :: tptmp 
       int4 :: h,i,ierr
 
-      size=pic2d%layout2d%collective%size
+      sizeone=pic2d%layout2d%collective%size
       comm=pic2d%layout2d%collective%comm
       rank=pic2d%layout2d%collective%rank
       allocate(rbuf(0:numtot-1))
@@ -279,7 +279,7 @@ contains
         allocate(sbuf(0:0))
         call mpi_gatherv(sbuf,numleft*numgr,mpi_double_precision,rbuf,rcounts, &
                        rdispls,mpi_double_precision,root,comm,ierr)     
-     nullify(tptmp) 
+      nullify(tptmp) 
     else    
         allocate(sbuf(0:numgr*numleft-1))
         h=0
@@ -296,12 +296,12 @@ contains
         call mpi_gatherv(sbuf,numleft*numgr,mpi_double_precision,rbuf,rcounts, &
                        rdispls,mpi_double_precision,root,comm,ierr)
         nullify(tptmp)
-    end if   
+    end if  
+
       if(rank==0) then
-         do i=0,numtot/numgr-1
+        do i=0,numtot/numgr-1
            h=NINT(rbuf(i*numgr+numgr-1))
            outarray((numgr-1)*(h-1)+1:(numgr-1)*(h-1)+numgr-1)=rbuf(i*numgr:i*numgr+numgr-2) 
-
         end do
       end if
 

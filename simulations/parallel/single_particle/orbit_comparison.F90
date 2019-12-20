@@ -286,9 +286,9 @@ end if
     num1=pic2d%layout2d%boxes(rank)%i_max-pic2d%layout2d%boxes(rank)%i_min+1
     num2=pic2d%layout2d%boxes(rank)%j_max-pic2d%layout2d%boxes(rank)%j_min+1                    
 
-call allocate_memory_to_field_2d_ful(pic2d%field2d,num1,num2,row)
-call allocate_memory_to_field_2d_gy(pic2d%field2d,num1,num2,row,mu_num)
-call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
+    call allocate_memory_to_field_2d_ful(pic2d%field2d,num1,num2,row)
+    call allocate_memory_to_field_2d_gy(pic2d%field2d,num1,num2,row,mu_num)
+    call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
 
    rootdata=>initialize_rootdata_structure(pic2d%layout2d%global_sz1*pic2d%layout2d%global_sz2)
 

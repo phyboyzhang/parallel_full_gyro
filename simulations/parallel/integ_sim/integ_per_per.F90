@@ -87,7 +87,8 @@ use m_para_orbit, only: borissolve_and_sort, fulrk4solve_and_sort, gyrork4solvea
                         gyrork4solveallmu
 use orbit_data_base, only: rk4ful2dnode, pointin_node,tp_ful2d_node, &
                            tp_ful2dsend_node, &
-                           rk4gy2dnode, tp_gy2d_node,tp_gy2dsend_node
+                           rk4gy2dnode, tp_gy2d_node,tp_gy2dsend_node, &
+                           tp_gy2dallmu_node
 use field_initialize,only: para_initialize_field_2d_mesh
 use m_tp_para_orbit, only: tp_push_ful_orbit, &
                            tp_push_gy_orbit_allmu, &
@@ -98,6 +99,8 @@ use m_precompute, only: precompute_ASPL, &
                         precompute_doublegyroaverage_matrix
 use piclayout, only: ful2d_node,gy2d_node,gy2dmu_node
 use diagnosis2D, only: compare_density_to_initnumber_gy
+use tp_preparation, only: initialize_test_particles, &
+                          move_print_tp_particles
 
 implicit none
 include "mpif.h"
@@ -136,7 +139,8 @@ include "mpif.h"
 !!!!  outputdata 
     int4 :: fileitemep_boris,fileitemep_rk4,fileitemep_gy
     character(100) :: filepathep_boris,filepathep_gy,filepathep_rk4,filepathep1,&
-                      filepathden,filepathden_ful,filepathden_gy   
+                      filepathden,filepathden_ful,filepathden_gy, &
+                      filepathorb,filepathorb_boris,filepathorb_gy   
     int4 :: fileitemden_boris,fileitemden_rk4,fileitemden_gy
     character(100) :: filepathden_boris,filepathden_rk4
 !!!! Test para_orbit
@@ -149,13 +153,17 @@ include "mpif.h"
     real8 :: vec(6),dt
     int4 :: order,h,num_time
 
-!!! Test test_particles
+!!!!!!!====: Test test_particles
     class(tp_ful2d_node), pointer :: tpful2d_head,tpful2dtmp,tprk4ful2d_head,tprk4ful2dtmp
-    class(tp_gy2d_node),  pointer :: tpgy2d_head,tpgy2dtmp
+    class(tp_gy2dallmu_node),dimension(:), pointer :: tpgy2dmu_head,tpgy2dmutmp
     class(tp_ful2dsend_node), dimension(:), pointer :: tpful2dsend_head,tpful2dsendtmp, &
                              tprk4ful2dsend_head, tprk4ful2dsendtmp
     class(tp_gy2dsend_node), dimension(:), pointer :: tpgy2dsend_head,tpgy2dsendtmp
-    int4 :: numleft_rk4,numleft_boris,numleft_gy,numcircle,numgr,numgr_gy
+    class(gyropoint_node), dimension(:),pointer :: pointhead
+    int4 :: numleft_rk4,numleft_boris,numcircle,numgr,numgr_gy
+!!!!!!=====================
+
+    int4, dimension(:), pointer :: numleft_gy
     character(25) :: pushkind
     int4, dimension(:), pointer :: num_rk4,num_gy
     real8 :: rho, theta,x2(2)
@@ -164,9 +172,6 @@ include "mpif.h"
 
 !!!! integrated simulation
     class(ful2d_node), pointer :: ful2d_head,ful2dtmp
-!   class(gy2d_node),  pointer :: gy2d_head, gy2dtmp
-!   class(ful2dsend_node), dimension(:),pointer ::currk
-!   class(gy2dsend_node), pointer :: gy2dsend_head,gy2dsendtmp
     class(gy2dmu_node), dimension(:), pointer :: gy2dmu_head, gy2dmutmp 
     int4 :: mu_num,mutest
     real8, dimension(:), pointer :: mu_nodes,mu_weights
@@ -190,7 +195,7 @@ include "mpif.h"
     pic2d%para2d%N_points=20
     pic2d%para2d%iter_number=10
     pic2d%para2d%numcircle=8
-    pic2d%para2d%numparticles=100000
+    pic2d%para2d%numparticles=20000   !100000
     pic2d%para2d%dtgy=1.0
     pic2d%para2d%num_time= 32 ! 15
     pic2d%para2d%boundary="double_per"
@@ -206,7 +211,7 @@ include "mpif.h"
     pic2d%para2d%mumin=0.0_f64
     pic2d%para2d%mumax=20._F64
     pic2d%para2d%mu_tail=1000
-    pic2d%para2d%mulast = 20
+    pic2d%para2d%mulast = 4
 !    pic2d%para2d%mu_num=39
     pic2d%para2d%gyroorder=1
     pic2d%para2d%amp = 0.05
@@ -229,21 +234,28 @@ include "mpif.h"
     numproc=pic2d%para2d%numproc 
     comm=pic2d%layout2d%collective%comm
 
-!    pic2d%para2d%numper = pic2d%para2d%numequ/100
+!!!!!!! allocate the arrays and linked list for the test particles 
+    allocate(num_p(0:size-1),recnum(0:size-1))
+    allocate(partlist,inlist)
 
-!    mu_num=pic2d%para2d%mu_num
+    allocate(tpful2d_head,tprk4ful2d_head)
+    allocate(tpful2dsend_head(0:size-1),tpful2dsendtmp(0:size-1))
+    allocate(tprk4ful2dsend_head(0:size-1), tprk4ful2dsendtmp(0:size-1))
+    allocate(tpgy2dsend_head(0:size-1), tpgy2dsendtmp(0:size-1))
+    allocate(num_rk4(0:size-1),num_gy(0:size-1))
+    allocate(ful2d_head)
 
+    allocate(tpgy2dmu_head(1),tpgy2dmutmp(1))
+    allocate(tpgy2dmu_head(1)%ptr)
+    allocate(numleft_gy(mu_num))
 
-!    allocate(num_p(0:size-1),recnum(0:size-1))
-!    allocate(partlist,inlist) 
-!
-!    allocate(tpful2d_head,tprk4ful2d_head,tpgy2d_head)
-!    allocate(tpful2dsend_head(0:size-1),tpful2dsendtmp(0:size-1))
-!    allocate(tprk4ful2dsend_head(0:size-1), tprk4ful2dsendtmp(0:size-1))
-!    allocate(tpgy2dsend_head(0:size-1), tpgy2dsendtmp(0:size-1))
-!    allocate(num_rk4(0:size-1),num_gy(0:size-1))
+!    allocate(mugyfileitems(mu_num))
 
-
+    allocate(pointhead(0:size-1))
+    do i=0, size-1
+      allocate(pointhead(i)%ptr)
+    end do
+!!!!!++++++++++++++++++++++++++++++++++++
     
     allocate(mu_nodes(100),mu_weights(100),munum_partition(100))
     munum_partition=0
@@ -368,7 +380,7 @@ end if
  !!! precomputing
   call precompute_ASPL(rank,global_sz,rootdata%ASPL)
 if(rank==0) then
-print*, "precomputing ASPL is finished."
+print*, "#precomputing ASPL is finished."
 endif
 
   call precompute_doublegyroaverage_matrix(rootdata,pic2d,pamearray)
@@ -377,14 +389,28 @@ endif
        pic2d%field2d%bf03wg,pic2d%field2d%BF03wg_w,pic2d%field2d%bf03wg_e,pic2d%field2d%bf03wg_n, &
        pic2d%field2d%bf03wg_s, pic2d%field2d%bf03wg_sw,pic2d%field2d%bf03wg_se, &
        pic2d%field2d%bf03wg_nw,pic2d%field2d%bf03wg_ne)
+
 if(rank==0) then
-print*, "precomputing is finished."
+print*, "#precomputing is finished."
 endif
+
+!call mpi_barrier(comm)
+!!!!!!======: initialize the test particle linked list
+if(rank==0) then
+print*, "#The initialization of the test particles begins."
+endif
+   numgr=5
+   numgr_gy=4
+   call initialize_test_particles(tpful2d_head,tprk4ful2d_head,tpgy2dmu_head, &
+            numleft_boris,numleft_rk4,numleft_gy,numgr,numgr_gy,1,pic2d)
+
+!!!!!=============
 
 
    fileitemep_boris=100
    fileitemep_rk4  =200
    fileitemep_gy   =300
+ 
    filepathep1="/home/qmlu/zsx163/parallel_full_gyro/data/ep_"
    filepathden="/home/qmlu/zsx163/parallel_full_gyro/data/den_"
 
@@ -392,9 +418,15 @@ endif
    filepathep_rk4=trim(filepathep1)//"rk4"//".txt"
    filepathep_gy  =trim(filepathep1)//"gy"//".txt"
    filepathden_ful = trim(filepathden)//"ful"//".txt"
+   
      call open_file(fileitemep_boris,filepathep_boris,rank)
      call open_file(fileitemep_rk4,  filepathep_rk4,  rank)
      call open_file(fileitemep_gy,   filepathep_gy,   rank)
+
+!!!!!!!!================: test particles
+   filepathorb= "/home/qmlu/zsx163/parallel_full_gyro/data/orb_"
+   filepathorb_boris=trim(filepathorb)//"boris"//".txt"
+   call open_file(40, filepathorb_boris, rank)
 
 !     call open_file(40, filepathden_ful,rank)
 !     i=1
@@ -406,7 +438,7 @@ endif
 
 !     close(40)
 
-  do i=1, 60  !pic2d%para2d%iter_number
+  do i=1, 2  !pic2d%para2d%iter_number
     if(rank==0) then
       print*, "#iter_number=", i
     endif
@@ -440,7 +472,10 @@ endif
         pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n,&
         pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
         pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
-
+   
+        call move_print_tp_particles(tpful2d_head,numleft_boris, &
+             numgr,40,j,"boris",pic2d)
+!print*, "rank1=",rank
         call borissolve_and_sort(ful2d_head,pic2d)
 
         call partition_density_to_grid_ful(ful2d_head,pic2d)
@@ -455,7 +490,8 @@ endif
      call close_file(fileitemep_boris,rank)
      call close_file(fileitemep_rk4,rank)
      call close_file(fileitemep_gy,rank)
-
+  
+     call close_file(40, rank)
  !!! and store the equilibrium distirbution on the mesh
     call MPI_FINALIZE(IERR) 
     if(rank==0) then

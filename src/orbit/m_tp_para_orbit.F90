@@ -19,11 +19,12 @@ public :: tp_push_ful_orbit, &
 
 contains
 
-    subroutine tp_push_ful_orbit(tp_ful2d_head,numleft,numgr,pic2d,pushkind,rk4order,iter_num)
+    subroutine tp_push_ful_orbit(tp_ful2d_head,numleft,numgr,pic2d,pushkind,iter_num, rk4order)
        class(pic_para_total2d_base), pointer :: pic2d
        class(tp_ful2d_node), pointer, intent(inout) :: tp_ful2d_head
        int4, intent(inout) :: numleft
-       int4, intent(in) :: numgr,iter_num,rk4order
+       int4, intent(in) :: numgr,iter_num
+       int4, optional,intent(in) :: rk4order
        character(len=*),intent(in) :: pushkind
        int4, dimension(:), pointer :: num
        int4 :: size,rank,comm
