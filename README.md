@@ -1,7 +1,7 @@
 # parallel_full_gyro
 This is a particle-in-cell code to compare full kinetic and gyrokinetic  simulation with hybrid parallel scheme
 
-0. By the comparison between the gyrokinetic simulation  and full-orbit simulation with the presence of the perturbation which has large amplitude and short wavelength, the purpose of this code is to verify the correctness of the gyrokinetic theory and simulations when such kind of perturbation exists. 
+0. By the comparison between the gyrokinetic simulation  and full-orbit simulation with the presence of the perturbation which has large amplitude and short wavelength (under the periodic and natural boundary conditions (only the periodic one is available now.)), the purpose of this code is to verify the correctness of the gyrokinetic theory and simulations when such kind of perturbation exists. 
 
 1. Only the electrostatic potential is considered in the current version.
 
@@ -20,3 +20,5 @@ not included.
 7. The sampling of particles along the magnetic moment "mu" dimension can be random sampling along that dimansion, or that by dividing the "mu" domain into a mesh, the number of particles at each node is obtain according to the distribution, and then all the particles with the same "mu" are randomly sampled.
 
 8. The cubic-b spline is used for the finite-element-method.
+
+9. This code can do integrated simulations as well as tracing the single particle orbit.
