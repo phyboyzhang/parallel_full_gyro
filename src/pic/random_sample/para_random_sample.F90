@@ -814,7 +814,7 @@ contains
         v=lcrg_evaluate(an,bn,c,u)
         m=m+size
         if(m.ge.k_hi) then
-          print*, "#ERROR: the inital given sampling number is big enough."
+          print*, "#ERROR: the inital given sampling number is not big enough."
           stop
         endif
         ratio=real(v,8)/real(c,8)
@@ -825,7 +825,7 @@ contains
         v=lcrg_evaluate(an,bn,c,u)
         m=m+size
         if(m.ge.k_hi) then
-          print*, "#ERROR: the inital given sampling number is nesseary."
+          print*, "#ERROR: the inital given sampling number is not big enough."
           stop
         endif
         ratio=real(v,8)/real(c,8)        
@@ -878,7 +878,7 @@ contains
         v=lcrg_evaluate(an,bn,c,u)
         m=m+size
         if(m.ge.k_hi) then
-          print*, "#ERROR: the inital given sampling number is nesseary."
+          print*, "#ERROR: the inital given sampling number is not big enough."
           stop
         endif
         ratio=real(v,8)/real(c,8)
@@ -888,7 +888,7 @@ contains
         v=lcrg_evaluate(an,bn,c,u)
         m=m+size
         if(m.ge.k_hi) then
-          print*, "#ERROR: the inital given sampling number is nesseary."
+          print*, "#ERROR: the inital given sampling number is not big enough."
           stop
         endif
         ratio=real(v,8)/real(c,8)
