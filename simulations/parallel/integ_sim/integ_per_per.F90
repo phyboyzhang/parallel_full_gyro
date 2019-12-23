@@ -58,7 +58,7 @@ use m_picutilities, only: singlepart_to_mesh, &
 use para_random_sample, only: para_accept_reject_gaussian1d_ful2d_per_per, &
                               para_accprej_gaus2d2v_fulgyro_unifield_per_per, &
                               para_accprej_gaus1d2v_fulgyro_unifield_per_per, &
-                              congru_accprej_trig2d2v_fulgyro_unifield_per_per
+                              congru_accprej_2d2v_fulgyro_unifield_per_per
 
 use m_moveparticles, only: push_particle_among_box_ful2d_per_per
 use m_fieldsolver, only: solve_weight_of_field_among_processes, &
@@ -183,6 +183,10 @@ include "mpif.h"
    character(100) :: filepathgy,filepathful
    int4 :: fileitemful,fileitemgy
 
+!!!! test
+   int4 :: ND(2)
+
+
     allocate(weight(-1:2,-1:2))
     call MPI_INIT(IERR)
     call MPI_COMM_SIZE(MPI_COMM_WORLD,size,ierr)
@@ -195,31 +199,31 @@ include "mpif.h"
     pic2d%para2d%N_points=20
     pic2d%para2d%iter_number=10
     pic2d%para2d%numcircle=8
-    pic2d%para2d%numparticles=20000   !100000
-    pic2d%para2d%dtgy=1.0
-    pic2d%para2d%num_time= 32 ! 15
+    pic2d%para2d%numparticles=200000
+    pic2d%para2d%dtgy=2.0
+    pic2d%para2d%num_time= 16 ! 15
     pic2d%para2d%boundary="double_per"
     pic2d%para2d%geometry="cartesian"
-    pic2d%para2d%mu=1.0
+    pic2d%para2d%mu=0.2
     pic2d%para2d%row=3
     pic2d%para2d%cell_per_unit=(/15,15/) 
     pic2d%para2d%dtful=pic2d%para2d%dtgy/real(pic2d%para2d%num_time,8)
     pic2d%para2d%mu_scheme = 1
     !!! particle in cell part
-    pic2d%para2d%sigma = 25.0
+    pic2d%para2d%sigma = 10.0
     pic2d%para2d%tempt = 1.0
     pic2d%para2d%mumin=0.0_f64
-    pic2d%para2d%mumax=20._F64
-    pic2d%para2d%mu_tail=1000
-    pic2d%para2d%mulast = 4
+    pic2d%para2d%mumax=4._F64
+    pic2d%para2d%mu_tail=500
+    pic2d%para2d%mulast = 50
 !    pic2d%para2d%mu_num=39
     pic2d%para2d%gyroorder=1
     pic2d%para2d%amp = 0.05
     pic2d%para2d%waveone = 2.0
     pic2d%para2d%wavetwo = 2.0
     row=pic2d%para2d%row
-    amp=0.001
-    amp_eq=0.01
+    amp=0.01
+    amp_eq=0.0
     wave_one=3.0
     wave_two=3.0
     num_time=pic2d%para2d%num_time
@@ -353,25 +357,32 @@ include "mpif.h"
     
   !!! prepare the inital distribution of particles
 !!  call para_accprej_gaus1d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray) 
-  call congru_accprej_trig2d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray) 
+  call congru_accprej_2d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray,"flat") 
 
         if(rank==0) then
         print*, "#samping particles is finished."
         end if
   call partition_density_to_grid_ful(ful2d_head,pic2d)
 
+!if(rank==1) then
+!print*, "denf",pic2d%field2d%denf
+!endif
+
   !!!! Here the equilibrium profile is not steep. For steep profile, the
   !gyroaverage operation should be implemented.
+
   call compute_equdensity(sum*pic2d%para2d%numcircle*size,pic2d%field2d%denfeq, &
        pic2d%field2d%denfeq_e,pic2d%field2d%denfeq_s,pic2d%field2d%denfeq_w, &
        pic2d%field2d%denfeq_n,pic2d%field2d%denfeq_ne,pic2d%field2d%denfeq_se, &
-       pic2d%field2d%denfeq_sw,pic2d%field2d%denfeq_nw,pic2d)
+       pic2d%field2d%denfeq_sw,pic2d%field2d%denfeq_nw,pic2d, "flat", 1)
+!if(rank==1) then
+!print*, "denfeq",pic2d%field2d%denfeq
+!endif
   call compare_density_to_initnumber_gy(pic2d%field2d%denf, pic2d)
 
   call partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d)
-!  call compute_equdensity_for_gy(pic2d)
+
   pic2d%field2d%dengeqtot = pic2d%field2d%denfeq
-!  call compare_density_to_initnumber_gy(pic2d%field2d%dengeqtot, pic2d)
 
 if(rank==0) then
 print*, "#computing density is finished."
@@ -379,16 +390,16 @@ end if
 
  !!! precomputing
   call precompute_ASPL(rank,global_sz,rootdata%ASPL)
-if(rank==0) then
-print*, "#precomputing ASPL is finished."
-endif
+!if(rank==0) then
+!print*, "#precomputing ASPL is finished."
+!endif
 
-  call precompute_doublegyroaverage_matrix(rootdata,pic2d,pamearray)
+!  call precompute_doublegyroaverage_matrix(rootdata,pic2d,pamearray)
 
-  call solve_weight_of_field_among_processes(pic2d%field2d%Bf03,rootdata,pic2d, &
-       pic2d%field2d%bf03wg,pic2d%field2d%BF03wg_w,pic2d%field2d%bf03wg_e,pic2d%field2d%bf03wg_n, &
-       pic2d%field2d%bf03wg_s, pic2d%field2d%bf03wg_sw,pic2d%field2d%bf03wg_se, &
-       pic2d%field2d%bf03wg_nw,pic2d%field2d%bf03wg_ne)
+!  call solve_weight_of_field_among_processes(pic2d%field2d%Bf03,rootdata,pic2d, &
+!       pic2d%field2d%bf03wg,pic2d%field2d%BF03wg_w,pic2d%field2d%bf03wg_e,pic2d%field2d%bf03wg_n, &
+!       pic2d%field2d%bf03wg_s, pic2d%field2d%bf03wg_sw,pic2d%field2d%bf03wg_se, &
+!       pic2d%field2d%bf03wg_nw,pic2d%field2d%bf03wg_ne)
 
 if(rank==0) then
 print*, "#precomputing is finished."
@@ -396,13 +407,13 @@ endif
 
 !call mpi_barrier(comm)
 !!!!!!======: initialize the test particle linked list
-if(rank==0) then
-print*, "#The initialization of the test particles begins."
-endif
    numgr=5
    numgr_gy=4
    call initialize_test_particles(tpful2d_head,tprk4ful2d_head,tpgy2dmu_head, &
             numleft_boris,numleft_rk4,numleft_gy,numgr,numgr_gy,1,pic2d)
+if(rank==0) then
+print*, "#The initialization of the test particles begins."
+endif
 
 !!!!!=============
 
@@ -427,7 +438,7 @@ endif
    filepathorb= "/home/qmlu/zsx163/parallel_full_gyro/data/orb_"
    filepathorb_boris=trim(filepathorb)//"boris"//".txt"
    call open_file(40, filepathorb_boris, rank)
-
+   call open_file(50, filepathden_ful,rank)
 !     call open_file(40, filepathden_ful,rank)
 !     i=1
 !       write(unit=muth,fmt=*) i
@@ -437,8 +448,32 @@ endif
 !     call para_write_field_file_2d(pic2d%field2d%denf,40,rootdata,pic2d)
 
 !     close(40)
+!        call para_write_field_file_2d(pic2d%field2d%ep,fileitemep_boris,rootdata,pic2d)
+  ND(1) = pic2d%para2d%m_x1%nodes
+  ND(2) = pic2d%para2d%m_x2%nodes
 
-  do i=1, 2  !pic2d%para2d%iter_number
+        do j=1,ND(2)
+          do k=1,ND(1)
+            pic2d%field2d%denf(k,j)=(pic2d%field2d%denf(k,j)-pic2d%field2d%denfeq(k,j))/pic2d%field2d%denfeq(k,j)
+!if(rank==0) then
+!print*, "denf=",pic2d%field2d%denfeq(k,j)
+!endif
+          end do
+        enddo
+
+call para_write_field_file_2d(pic2d%field2d%denf,50,rootdata,pic2d)
+call solve_field_ful(rootdata,pic2d,pamearray)
+        call solve_weight_of_field_among_processes(pic2d%field2d%ep,rootdata,pic2d, &
+        pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n,&
+        pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
+        pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
+
+ 
+!if(rank==5) then
+!print*, "rank=",rank,pic2d%field2d%ep_weight
+!print*,
+!endif
+  do i=1, 100  !pic2d%para2d%iter_number
     if(rank==0) then
       print*, "#iter_number=", i
     endif
@@ -464,25 +499,29 @@ endif
 !       if(rank==0) then
 !         print*, "#j=",j
 !       endif
-        call solve_field_ful(rootdata,pic2d,pamearray)
-        call para_write_field_file_2d(pic2d%field2d%ep,fileitemep_boris,rootdata,pic2d)
+   !     call solve_field_ful(rootdata,pic2d,pamearray)
+
+!        call para_write_field_file_2d(pic2d%field2d%ep,fileitemep_boris,rootdata,pic2d)
+!        do j=1,ND(2)
+!          do k=1,ND(1)
+!            pic2d%field2d%denf(k,j)=(pic2d%field2d%denf(k,j)-pic2d%field2d%denfeq(k,j))/pic2d%field2d%denfeq(k,j)
+!          end do
+!        enddo
 
 
-        call solve_weight_of_field_among_processes(pic2d%field2d%ep,rootdata,pic2d, &
-        pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n,&
-        pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
-        pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
-   
+!        call solve_weight_of_field_among_processes(pic2d%field2d%denf,rootdata,pic2d, &
+!        pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n,&
+!        pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
+!        pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
+ 
+   !     call borissolve_and_sort(ful2d_head,pic2d)
+
+   !     call partition_density_to_grid_ful(ful2d_head,pic2d)
+
+  
         call move_print_tp_particles(tpful2d_head,numleft_boris, &
              numgr,40,j,"boris",pic2d)
-!print*, "rank1=",rank
-        call borissolve_and_sort(ful2d_head,pic2d)
 
-        call partition_density_to_grid_ful(ful2d_head,pic2d)
-
-!     if(rank==0) then
-!     print*, pic2d%field2d%ep
-!     endif
 
 !   end do
   end do
@@ -492,6 +531,7 @@ endif
      call close_file(fileitemep_gy,rank)
   
      call close_file(40, rank)
+     call close_file(50, rank)
  !!! and store the equilibrium distirbution on the mesh
     call MPI_FINALIZE(IERR) 
     if(rank==0) then

@@ -165,7 +165,7 @@ include "mpif.h"
     pic2d=> initialize_pic_para_total2d_base(size)
 !!! initialize parameter_2d_sets
     pic2d%para2d%gxmin=(/0.0,0.0/)
-    pic2d%para2d%gxmax=(/2.0*pi_,2.0*pi_/)
+    pic2d%para2d%gxmax=(/1.0*pi_,1.0*pi_/)
     pic2d%para2d%N_points=50
     pic2d%para2d%iter_number=100
     pic2d%para2d%numcircle=3
@@ -176,7 +176,7 @@ include "mpif.h"
     pic2d%para2d%mu=1.0
     pic2d%para2d%mu_num=1
     pic2d%para2d%row=3
-    pic2d%para2d%cell_per_unit=(/30,30/) 
+    pic2d%para2d%cell_per_unit=(/15,15/) 
     pic2d%para2d%dtful=pic2d%para2d%dtgy/real(pic2d%para2d%num_time,8)
     !!! particle in cell part
     pic2d%para2d%sigma = 1.0
@@ -185,10 +185,10 @@ include "mpif.h"
     pic2d%para2d%mumax=20._F64
     pic2d%para2d%gyroorder=1
     row=pic2d%para2d%row
-    amp=0.005  !0.02
+    amp=0.01  !0.02
     amp_eq=0.005  !0.001
-    wave_one=35.0
-    wave_two=35.0
+    wave_one=3.0
+    wave_two=3.0
     num_time=pic2d%para2d%num_time
     cell_per_unit=pic2d%para2d%cell_per_unit
 
@@ -505,6 +505,9 @@ end if
 !end do
 !print*, "rank2=",rank,num_p
 
+if(rank==0) then
+print*, pic2d%field2d%ep_weight
+endif
 
 rk4order=4
 

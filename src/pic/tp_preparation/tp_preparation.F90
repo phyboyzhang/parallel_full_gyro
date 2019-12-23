@@ -78,7 +78,7 @@ contains
     num_gy=0
  
     if(rank==0) then
-      x1(1)=(pic2d%para2d%gxmin(1)+pic2d%para2d%gxmax(1))/2.0+0.5
+      x1(1)=(pic2d%para2d%gxmin(1)+pic2d%para2d%gxmax(1))/2.0
       x1(2)=(pic2d%para2d%gxmin(2)+pic2d%para2d%gxmax(2))/2.0
       rho=sqrt(2._f64*pic2d%para2d%mu)
 

@@ -59,7 +59,7 @@ use para_random_sample, only: para_accept_reject_gaussian1d_ful2d_per_per, &
                               para_accprej_gaus2d2v_fulgyro_unifield_per_per, &
                               para_accprej_gaus1d2v_fulgyro_unifield_per_per, &
                               congru_accprej_gaus1d2v_fulgyro_unifield_per_per, &
-                              congru_accprej_trig2d2v_fulgyro_unifield_per_per
+                              congru_accprej_2d2v_fulgyro_unifield_per_per
 
 use m_moveparticles, only: push_particle_among_box_ful2d_per_per
 use m_fieldsolver, only: solve_weight_of_field_among_processes, &
@@ -208,7 +208,7 @@ include "mpif.h"
     pic2d%para2d%mulast = 50
 !    pic2d%para2d%mu_num=39
     pic2d%para2d%gyroorder=1
-    pic2d%para2d%amp = 0.05
+    pic2d%para2d%amp = 0.5
     pic2d%para2d%waveone = 2.0
     pic2d%para2d%wavetwo = 2.0
     row=pic2d%para2d%row
@@ -325,7 +325,7 @@ end if
 if(rank==0) then
   print*, "#the sampling of particles begins"
 endif
-  call congru_accprej_trig2d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray)  
+  call congru_accprej_2d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray,"flat")  
 
 !if(rank==0) then
 !print*, "munum_partion=",pamearray%munum_partition
@@ -352,7 +352,7 @@ endif
   call compute_equdensity(sum*pic2d%para2d%numcircle*size,pic2d%field2d%denfeq, &
        pic2d%field2d%denfeq_e,pic2d%field2d%denfeq_s,pic2d%field2d%denfeq_w, &
        pic2d%field2d%denfeq_n,pic2d%field2d%denfeq_ne,pic2d%field2d%denfeq_se, &
-       pic2d%field2d%denfeq_sw,pic2d%field2d%denfeq_nw,pic2d)
+       pic2d%field2d%denfeq_sw,pic2d%field2d%denfeq_nw,pic2d,"flat",1)
   call compare_density_to_initnumber_gy(pic2d%field2d%denf, pic2d)
 
   ND(1)=pic2d%para2d%m_x1%nodes

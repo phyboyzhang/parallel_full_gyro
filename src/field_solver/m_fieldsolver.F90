@@ -11,7 +11,7 @@ use m_parautilities, only: gather_field_to_rootprocess_per_per, &
 use paradata_utilities, only: coords_from_localind
 use para_gyroaverage_2d_one, only: para_compute_gyroaverage_mesh_field, &
                                    para_compute_gyroaverage_field_on_mesh
-use field_initialize, only: test_trigonfun
+use field_initialize, only: test_trigonfun, test_equdistr
 implicit none
 
 public :: solve_weight_of_field_among_processes, &
@@ -107,7 +107,7 @@ contains
        num1=size(pic2d%field2d%denf,1)
        num2=size(pic2d%field2d%denf,2)
  
-       pic2d%field2d%denf=pic2d%field2d%denf-pic2d%field2d%denfeq
+       pic2d%field2d%ep=pic2d%field2d%denf-pic2d%field2d%denfeq
 !       if(rank==0) then
 !         print*, "denf=", pic2d%field2d%denf
 !         print*, 
@@ -115,7 +115,7 @@ contains
 !       endif
        do i= 1,num1
          do j=1,num2
-            pic2d%field2d%ep(i,j)=pic2d%field2d%denf(i,j)*pamearray%temp_e(i,j)/ &
+            pic2d%field2d%ep(i,j)=pic2d%field2d%ep(i,j)*pamearray%temp_e(i,j)/ &
                                     pic2d%field2d%denfeq(i,j) 
          end do
        enddo
@@ -200,14 +200,17 @@ contains
      end subroutine
  
 
-     subroutine compute_equdensity(numparticles,box,re,rs,rw,rn,rne,rse,rsw,rnw,pic2d)
+     subroutine compute_equdensity(numparticles,box,re,rs,rw,rn,rne,rse,rsw,rnw,pic2d,eqdistr,statkind)
        class(pic_para_total2d_base), pointer, intent(inout) :: pic2d
        real(8), dimension(:,:),pointer :: box,re,rs,rw,rn,rne,rse,rsw,rnw
        int4, intent(in) :: numparticles
-       real8 :: gxmin(2), delta(2),coords(2)
+       real8 :: gxmin(2), delta(2),coords(2),mean(2)
        int4 :: ND(2),rank,comm,boxindex(4),row,numproc(2),globind(2)
        int4 :: i,j     
        real8 :: summ=0.0
+
+       character(len=*), optional,intent(in) :: eqdistr
+       int4, intent(in) :: statkind
  
        comm=pic2d%layout2d%collective%comm
        rank=pic2d%layout2d%collective%rank
@@ -220,26 +223,37 @@ contains
        gxmin=pic2d%para2d%gxmin
        row=pic2d%para2d%row
        numproc=NINT(sqrt(real(pic2d%layout2d%collective%size,8)))
-      
-        
-       call get_layout_2d_box_index(pic2d%layout2d, rank,boxindex)
-       do j=1,globind(2)
-         coords(2)=gxmin(2)+delta(2)*real(j-1,8)
-         do i=1,globind(1)
-           coords(1)=gxmin(1)+delta(1)*real(i-1,8)
-           coords=coords_from_localind((/i,j/),rank,pic2d%para2d%gboxmin,delta)
-           summ=summ+test_trigonfun(coords(1),pic2d%para2d%amp,pic2d%para2d%waveone,pic2d%para2d%wavetwo)*delta(1)*delta(2)
-         enddo
-       enddo
+       mean=(pic2d%para2d%gxmin+pic2d%para2d%gxmax)/2.0
 
-       do j=1,ND(2)
-         do i=1,ND(1)
-           coords=coords_from_localind((/i,j/),rank,pic2d%para2d%gboxmin,delta)           
-           box(i,j)=test_trigonfun(coords(1),pic2d%para2d%amp,pic2d%para2d%waveone,pic2d%para2d%wavetwo)*delta(1) &
+!!!!! Here, MPI_ALLREDUCE is better.      
+       select case(statkind)
+         case(1)
+         call get_layout_2d_box_index(pic2d%layout2d, rank,boxindex)
+         do j=1,globind(2)
+           coords(2)=gxmin(2)+delta(2)*real(j-1,8)
+           do i=1,globind(1)
+             coords(1)=gxmin(1)+delta(1)*real(i-1,8)
+!             coords=coords_from_localind((/i,j/),rank,pic2d%para2d%gboxmin,delta)
+             summ=summ+test_equdistr(coords,pic2d%para2d%sigma,mean,eqdistr)*delta(1)*delta(2)
+           enddo
+         enddo
+
+         do j=1,ND(2)
+           do i=1,ND(1)
+             coords=coords_from_localind((/i,j/),rank,pic2d%para2d%gboxmin,delta)           
+             box(i,j)=test_equdistr(coords,pic2d%para2d%sigma,mean,eqdistr)*delta(1) &
                     *delta(2)/summ*real(numparticles,8)
-         end do
-       enddo
-       
+           end do
+         enddo
+         
+       case(2)
+         box = pic2d%field2d%denf         
+       case default
+         stop
+       end select
+ 
+!print*,1
+
        call mpi2d_alltoallv_box_per_per(row,comm,rank,numproc, &
                                         box,rw,re,rn,rs,rsw,rse,rnw,rne,boxindex)
        

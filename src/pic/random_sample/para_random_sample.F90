@@ -25,7 +25,7 @@ module para_random_sample
            para_accprej_gaus1d2v_fulgyro_unifield_per_per, &
            congru_accprej_gaus1d2v_fulgyro_unifield_per_per, &
    !        congru_accprej_flatpert2d2v_fulgyro_unifield_per_per, &
-           congru_accprej_trig2d2v_fulgyro_unifield_per_per
+           congru_accprej_2d2v_fulgyro_unifield_per_per
   
 contains
 
@@ -593,13 +593,15 @@ contains
 !    deallocate(munum_partion)
   end subroutine congru_accprej_gaus1d2v_fulgyro_unifield_per_per  
 
-  subroutine congru_accprej_trig2d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray)
+  subroutine congru_accprej_2d2v_fulgyro_unifield_per_per(ful2d_head,gy2dmu_head,pic2d,pamearray,eqdistr)
     class(pic_para_total2d_base), pointer :: pic2d
     class(parameters_array_2d), pointer, intent(in) :: pamearray
     class(ful2d_node), pointer, intent(inout) :: ful2d_head
     class(ful2dsend_node), dimension(:),pointer :: ful2dsend_head, fulcur
 !    class(gy2d_node), pointer, intent(inout) :: gy2d_head
     class(gy2dmu_node), dimension(:), pointer,intent(inout) :: gy2dmu_head
+    character(len=*),intent(in) :: eqdistr
+
     class(gy2dsend_node), dimension(:), pointer :: gy2dsend_head,gycur
     real8 :: mean(2),y(2),yf(2),py,pymax,x,x1,py1,gmin(2),gmax(2),mu
     int4,dimension(:),pointer :: num
@@ -700,9 +702,16 @@ contains
     end do
 
     do i=1, pamearray%munum_partition(j) 
-     
-        call congru_sampling_kernel_trigonometry(v,size,k_hi,m,an,bn,c,y,yf,pymax,pic2d)
-    
+!      select case(distri)
+!        case("trig")    
+!          call congru_sampling_kernel_trigonometry(v,size,k_hi,m,an,bn,c,y,yf,pymax,pic2d)
+!        case("flat")
+!          call congru_sampling_kernel_flat(v,size,k_hi,m,an,bn,c,y,yf,pymax,pic2d)
+!        case default
+!          stop
+!      end select
+          call congru_sampling_kernel_trigonometry(v,size,k_hi,m,an,bn,c,y,yf,pymax,mean,eqdistr,pic2d)
+
         rank1=compute_process_of_point_per_per(y,pic2d%para2d%numproc,pic2d%para2d%gxmin, &
                 pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)
 
@@ -766,11 +775,13 @@ contains
     deallocate(num,num_gy)
     deallocate(gy2dmutmp)
 !    deallocate(munum_partion)
-   end subroutine congru_accprej_trig2d2v_fulgyro_unifield_per_per  
+   end subroutine congru_accprej_2d2v_fulgyro_unifield_per_per  
 
-   subroutine congru_sampling_kernel_trigonometry(v,size,k_hi,m,an,bn,c,y,yf,pmax,pic2d) 
+   subroutine congru_sampling_kernel_trigonometry(v,size,k_hi,m,an,bn,c,y,yf,pmax,mean,eqdistr,pic2d) 
      class(pic_para_total2d_base), intent(in) :: pic2d
      int4, intent(in) :: size,k_hi,an,bn,c
+     real8, intent(in) :: mean(2)
+     character(len=*), intent(in) :: eqdistr
      int4 :: m,v
      real(8), intent(in) :: pmax
      real(8), intent(inout) :: y(2),yf(2)
@@ -784,11 +795,14 @@ contains
      amp=pic2d%para2d%amp
      waveone=pic2d%para2d%waveone
      wavetwo=pic2d%para2d%wavetwo
+ 
+!     select case(eqdistr)
+!       case("gaussian")
         u=v
         v=lcrg_evaluate(an,bn,c,u)
         m=m+size
         if(m.ge.k_hi) then
-          print*, "#ERROR: the inital given sampling number is nesseary."
+          print*, "#ERROR: the inital given sampling number is not big enough."
           stop
         endif
         ratio=real(v,8)/real(c,8)
@@ -800,12 +814,12 @@ contains
         v=lcrg_evaluate(an,bn,c,u)
         m=m+size
         if(m.ge.k_hi) then
-          print*, "#ERROR: the inital given sampling number is nesseary."
+          print*, "#ERROR: the inital given sampling number is big enough."
           stop
         endif
         ratio=real(v,8)/real(c,8)
         y(1)=gmin(1)+(gmax(1)-gmin(1))*ratio
-        py=test_trigonfun(y,amp,waveone,wavetwo)
+        py=test_trigonfun(y,amp,waveone,wavetwo,pic2d%para2d%sigma,mean,eqdistr)
 
         u=v
         v=lcrg_evaluate(an,bn,c,u)
@@ -819,7 +833,68 @@ contains
       end do
         yf=y
 
+!      case("flat")
+!        u=v
+!        v=lcrg_evaluate(an,bn,c,u)
+!        m=m+size
+!        if(m.ge.k_hi) then
+!          print*, "#ERROR: the inital given sampling number is nesseary."
+!          stop
+!        endif
+!        ratio=real(v,8)/real(c,8)
+!        y(2)=gmin(2)+(gmax(2)-gmin(2))*ratio
+!
+!        u=v
+!        v=lcrg_evaluate(an,bn,c,u)
+!        m=m+size
+!        if(m.ge.k_hi) then
+!          print*, "#ERROR: the inital given sampling number is nesseary."
+!          stop
+!        endif
+!        ratio=real(v,8)/real(c,8)
+!        y(1)=gmin(1)+(gmax(1)-gmin(1))*ratio
+!
+!        yf=y
+!
+!      case default
+!        stop
+!
+!      end select
+
    end subroutine
 
+   subroutine congru_sampling_kernel_flat(v,size,k_hi,m,an,bn,c,y,yf,pmax,pic2d)
+     class(pic_para_total2d_base), intent(in) :: pic2d
+     int4, intent(in) :: size,k_hi,an,bn,c
+     int4 :: m,v
+     real(8), intent(in) :: pmax
+     real(8), intent(inout) :: y(2),yf(2)
+
+     real(8) :: gmin(2),gmax(2),amp,waveone,wavetwo
+     int4 :: u
+     real(8) :: ratio,x,py
+
+        u=v
+        v=lcrg_evaluate(an,bn,c,u)
+        m=m+size
+        if(m.ge.k_hi) then
+          print*, "#ERROR: the inital given sampling number is nesseary."
+          stop
+        endif
+        ratio=real(v,8)/real(c,8)
+        y(2)=gmin(2)+(gmax(2)-gmin(2))*ratio
+
+        u=v
+        v=lcrg_evaluate(an,bn,c,u)
+        m=m+size
+        if(m.ge.k_hi) then
+          print*, "#ERROR: the inital given sampling number is nesseary."
+          stop
+        endif
+        ratio=real(v,8)/real(c,8)
+        y(1)=gmin(1)+(gmax(1)-gmin(1))*ratio
+
+        yf=y
+   end subroutine congru_sampling_kernel_flat
 
 end module para_random_sample

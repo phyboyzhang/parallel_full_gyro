@@ -17,7 +17,8 @@ module field_initialize
        compute_field_2d_mesh, &
        magfield_2d_interpolation_point, &
        para_initialize_field_2d_mesh, &
-       test_trigonfun
+       test_trigonfun, &
+       test_equdistr
 
 contains
 
@@ -324,14 +325,30 @@ contains
   end subroutine para_initialize_field_2d_mesh
 
 
-   function test_trigonfun(y,amp,waveone,wavetwo)
-     real8,intent(in) :: amp,waveone,wavetwo,y(2)
+   function test_equdistr(y,sigma,mean,equdistr)
+     real8, intent(in) :: y(2), sigma,mean(2)
+     character(len=*), intent(in) :: equdistr
+     real8 :: test_equdistr     
+
+     select case(equdistr)
+       case("flat")
+          test_equdistr= 1.0
+       case("gaussian")
+          test_equdistr=exp(-(y(1)-mean(1))*(y(1)-mean(1))/sigma)
+       case default
+         stop
+     end select
+   endfunction test_equdistr
+
+   function test_trigonfun(y,amp,waveone,wavetwo,sigma,mean,equdistr)
+     real8,intent(in) :: amp,waveone,wavetwo,y(2), sigma,mean(2)
+     character(len=*), intent(in) :: equdistr     
      real8 :: test_trigonfun
 
-     test_trigonfun=1+amp*sin(waveone*y(1))+amp*cos(wavetwo*y(2))
+     test_trigonfun=test_equdistr(y,sigma,mean,equdistr)+amp*sin(waveone*y(1))+amp*cos(wavetwo*y(2))
 
    end function test_trigonfun
 
- 
+    
 
 end module field_initialize
