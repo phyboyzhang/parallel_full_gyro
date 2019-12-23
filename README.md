@@ -1,5 +1,5 @@
 # parallel_full_gyro
-This is a particle-in-cell code to compare full kinetic and gyrokinetic  simulation with hybrid parallel scheme
+This is a particle-in-cell code to compare between  full-kinetic and gyrokinetic  simulations with hybrid parallel scheme.
 
 0. By the comparison between the gyrokinetic simulation  and full-orbit simulation with the presence of the perturbation which has large amplitude and short wavelength (under the periodic and natural boundary conditions (only the periodic one is available now.)), the purpose of this code is to verify the correctness of the gyrokinetic theory and simulations when such kind of perturbation exists. 
 
