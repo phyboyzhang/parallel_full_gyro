@@ -458,21 +458,21 @@ endif
 !          end do
 !        enddo
 
-call para_write_field_file_2d(pic2d%field2d%denf,50,rootdata,pic2d)
+!call para_write_field_file_2d(pic2d%field2d%denf,50,rootdata,pic2d)
+!
+!call solve_field_ful(rootdata,pic2d,pamearray)
+!        call solve_weight_of_field_among_processes(pic2d%field2d%ep,rootdata,pic2d, &
+!        pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n,&
+!        pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
+!        pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
 
-call solve_field_ful(rootdata,pic2d,pamearray)
-        call solve_weight_of_field_among_processes(pic2d%field2d%ep,rootdata,pic2d, &
-        pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n,&
-        pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
-        pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
-
- if(rank==2) then
-print*, "rank=",rank,pic2d%field2d%ep_weight
-print*,
-endif
+! if(rank==2) then
+!print*, "rank=",rank,pic2d%field2d%ep_weight
+!print*,
+!endif
 
 
-  do i=1, 100  !pic2d%para2d%iter_number
+  do i=1, 300  !pic2d%para2d%iter_number
     if(rank==0) then
       print*, "#iter_number=", i
     endif
@@ -498,9 +498,11 @@ endif
 !       if(rank==0) then
 !         print*, "#j=",j
 !       endif
-   !     call solve_field_ful(rootdata,pic2d,pamearray)
-
-!        call para_write_field_file_2d(pic2d%field2d%ep,fileitemep_boris,rootdata,pic2d)
+        call solve_field_ful(rootdata,pic2d,pamearray)
+ 
+        if(modulo(i,3)==0) then
+          call para_write_field_file_2d(pic2d%field2d%ep,fileitemep_boris,rootdata,pic2d)
+        endif
 !        do j=1,ND(2)
 !          do k=1,ND(1)
 !            pic2d%field2d%denf(k,j)=(pic2d%field2d%denf(k,j)-pic2d%field2d%denfeq(k,j))/pic2d%field2d%denfeq(k,j)
@@ -508,14 +510,14 @@ endif
 !        enddo
 
 
-!        call solve_weight_of_field_among_processes(pic2d%field2d%denf,rootdata,pic2d, &
-!        pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n,&
-!        pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
-!        pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
+        call solve_weight_of_field_among_processes(pic2d%field2d%denf,rootdata,pic2d, &
+        pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n,&
+        pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
+        pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
  
-   !     call borissolve_and_sort(ful2d_head,pic2d)
+        call borissolve_and_sort(ful2d_head,pic2d)
 
-   !     call partition_density_to_grid_ful(ful2d_head,pic2d)
+        call partition_density_to_grid_ful(ful2d_head,pic2d)
 
   
         call move_print_tp_particles(tpful2d_head,numleft_boris, &

@@ -99,7 +99,7 @@ subroutine boris_single(x,v,dtful,magf,elef)
    int4,optional, intent(in) :: numleft
    class(ful2d_node), pointer :: tmp
    character(25) :: geometry,boundary
-   real8 :: x(3), v(3),elef(3),magf(3)  
+   real8 :: x(3), v(3),elef(3),magf(3),gxmin(2),gxmax(2)  
    real8 :: dtful
    int4  :: row
 
@@ -107,6 +107,10 @@ subroutine boris_single(x,v,dtful,magf,elef)
    dtful=pic2d%para2d%dtful  
    geometry=pic2d%para2d%geometry
    boundary=pic2d%para2d%boundary
+   gxmin(1)=pic2d%para2d%m_x1%eta_min
+   gxmin(2)=pic2d%para2d%m_x2%eta_min
+   gxmax(1)=pic2d%para2d%m_x1%eta_max
+   gxmax(2)=pic2d%para2d%m_x2%eta_max
  
   if(present(numleft)) then
     if(numleft==0) then
@@ -138,6 +142,8 @@ subroutine boris_single(x,v,dtful,magf,elef)
                      pic2d%field2d%bf03wg_s,pic2d%field2d%bf03wg_sw,pic2d%field2d%bf03wg_se, &
                      pic2d%field2d%bf03wg_ne,pic2d%field2d%bf03wg_nw)   
              call boris_single(x,v,dtful,magf,elef)
+
+             call coordinates_pointoutbound_per_per(x(1:2),gxmin,gxmax)
              tmp%coords(1:2)=x(1:2)
              tmp%coords(3:4)=v(1:2)
              tmp=>tmp%next
