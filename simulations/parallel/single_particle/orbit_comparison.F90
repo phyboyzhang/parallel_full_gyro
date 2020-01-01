@@ -440,7 +440,7 @@ end if
    call tp_mpi2d_alltoallv_send_particle_2d(tpful2d_head,numleft_boris,tpful2dsend_head,num_p,numgr,pic2d)
    call tp_mpi2d_alltoallv_send_particle_2d(tprk4ful2d_head,numleft_rk4,tprk4ful2dsend_head,num_rk4,numgr,pic2d)
    call tp_mpi2d_alltoallv_send_particle_2d_gy(tpgy2dmu_head,numleft_gy(1),tpgy2dsend_head, &
-                                                num_gy,numgr_gy,1,pic2d)
+                                                num_gy,numgr_gy,1,1,pic2d)
 
 
 !tpgy2dtmp=>tpgy2d_head

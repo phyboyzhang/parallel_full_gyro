@@ -25,7 +25,7 @@ module m_para_orbit
             fulrk4solve, &
             gyrork4solve, &
             gyrork4solveallmu, &
-            boris_single, &
+            boris_single_per_per, &
             para_obtain_interpolation_elefield_per_per_ful, &
             sortposition_by_process_ful2d, &
             compute_f_of_points_out_orbit_ful2d, &
@@ -38,10 +38,11 @@ module m_para_orbit
 contains
 
 
-subroutine boris_single(x,v,dtful,magf,elef)
+subroutine boris_single_per_per(x,v,dtful,magf,elef,gxmin,gxmax)
     real8, dimension(:), intent(inout) :: x,v
     real8, intent(in) :: dtful
     real8, dimension(3), intent(in) :: magf, elef
+    real8, intent(in) :: gxmin(2),gxmax(2)
     real8 :: pomat(3,3),nomat(3,3),xco(3),vel(3),vec(3,1)
     real8 :: x1(2)   
     int4 :: N=3, NRHS=1, LDA=3, LDB=3,INFO
@@ -68,14 +69,14 @@ subroutine boris_single(x,v,dtful,magf,elef)
    pomat(3,3)=pomat(3,3)+1.0_f64
 
    do i=1,3,1
-    xco(i)=x(i)
-    vel(i)=v(i)
+     xco(i)=x(i)
+     vel(i)=v(i)
    end do
 
    do i=1,3,1
      vec(i,1)=0.0_f64
      do j=1,3,1
-     vec(i,1)=vec(i,1)+nomat(i,j)*vel(j)
+       vec(i,1)=vec(i,1)+nomat(i,j)*vel(j)
      end do
      vec(i,1)=vec(i,1)+dtful*elef(i)
    end do
@@ -90,10 +91,13 @@ subroutine boris_single(x,v,dtful,magf,elef)
     x(i)=xco(i)
     v(i)=vec(i,1)
    end do
-   return
- end subroutine boris_single
 
- subroutine borissolve(ful2d_head,pic2d,numleft)
+   call coordinates_pointoutbound_per_per(x(1:2),gxmin,gxmax)
+
+   return
+ end subroutine boris_single_per_per
+
+subroutine borissolve(ful2d_head,pic2d,numleft)
    class(pic_para_total2d_base), pointer :: pic2d
    class(ful2d_node), pointer, intent(inout) :: ful2d_head
    int4,optional, intent(in) :: numleft
@@ -107,10 +111,12 @@ subroutine boris_single(x,v,dtful,magf,elef)
    dtful=pic2d%para2d%dtful  
    geometry=pic2d%para2d%geometry
    boundary=pic2d%para2d%boundary
-   gxmin(1)=pic2d%para2d%m_x1%eta_min
-   gxmin(2)=pic2d%para2d%m_x2%eta_min
-   gxmax(1)=pic2d%para2d%m_x1%eta_max
-   gxmax(2)=pic2d%para2d%m_x2%eta_max
+   gxmin=pic2d%para2d%gxmin
+   gxmax=pic2d%para2d%gxmax
+!   gxmin(1)=pic2d%para2d%m_x1%eta_min
+!   gxmin(2)=pic2d%para2d%m_x2%eta_min
+!   gxmax(1)=pic2d%para2d%m_x1%eta_max
+!   gxmax(2)=pic2d%para2d%m_x2%eta_max
  
   if(present(numleft)) then
     if(numleft==0) then
@@ -136,14 +142,14 @@ subroutine boris_single(x,v,dtful,magf,elef)
              v(1:2)=tmp%coords(3:4)
              v(3)=0.0
              call para_obtain_interpolation_elefield_per_per_ful(tmp%coords(1:2), elef, pic2d)
+
              magf(3)=para_compute_spl2d_field_point_per_per(tmp%coords(1:2),pic2d%para2d%m_x1, &
                      pic2d%para2d%m_x2,row, pic2d%field2d%bf03wg,pic2d%field2d%bf03wg_w,& 
                      pic2d%field2d%bf03wg_e,pic2d%field2d%bf03wg_n, &
                      pic2d%field2d%bf03wg_s,pic2d%field2d%bf03wg_sw,pic2d%field2d%bf03wg_se, &
                      pic2d%field2d%bf03wg_ne,pic2d%field2d%bf03wg_nw)   
-             call boris_single(x,v,dtful,magf,elef)
+             call boris_single_per_per(x,v,dtful,magf,elef,gxmin,gxmax)
 
-             call coordinates_pointoutbound_per_per(x(1:2),gxmin,gxmax)
              tmp%coords(1:2)=x(1:2)
              tmp%coords(3:4)=v(1:2)
              tmp=>tmp%next
@@ -1398,7 +1404,6 @@ subroutine boris_single(x,v,dtful,magf,elef)
    end subroutine gyrork4solveallmu_and_sort
 
    subroutine para_obtain_interpolation_elefield_per_per_ful(x1, elef, pic2d)
-
     class(pic_para_total2d_base), pointer,intent(in) :: pic2d
     real8, dimension(2),intent(in) :: x1
     real8, dimension(3), intent(inout) :: elef
@@ -1415,7 +1420,6 @@ subroutine boris_single(x,v,dtful,magf,elef)
     elef(1)=-deri_firstorder(1)
     elef(2)=-deri_firstorder(2)
     elef(3)= 0.0_f64
-
 
    end subroutine para_obtain_interpolation_elefield_per_per_ful
 

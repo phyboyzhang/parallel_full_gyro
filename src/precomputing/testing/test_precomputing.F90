@@ -277,12 +277,12 @@ include "mpif.h"
 
      pamearray=>allocate_parameters_array_2d(mu_num,global_sz(1:2))
 
-   call initialize_parameters_2d(pic2d,pamearray) 
+   call initialize_parameters_2d(pic2d,global_sz) 
    call initialize_parameters_array_2d(pic2d%para2d%mumax,mu_num,pic2d%para2d%mu_scheme,pamearray, &
         mu_nodes,mu_weights,munum_partition,pic2d%para2d%tempt)  
 
-   pamearray%temp_i=1.0
-   pamearray%temp_e=1.0
+   pic2d%para2d%temp_i=1.0
+   pic2d%para2d%temp_e=1.0
 
    sum=0
    do i=1,mu_num

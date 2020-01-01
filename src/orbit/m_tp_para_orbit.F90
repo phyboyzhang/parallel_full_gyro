@@ -87,7 +87,7 @@ contains
 
          call tp_sort_particles_among_ranks_gy(tpgy2dmu_head,tp_gy2dsend_head,i,pic2d,num)
  
-         call tp_mpi2d_alltoallv_send_particle_2d_gy(tpgy2dmu_head,numleft(i),tp_gy2dsend_head,num,numgr,i,pic2d)
+         call tp_mpi2d_alltoallv_send_particle_2d_gy(tpgy2dmu_head,numleft(i),tp_gy2dsend_head,num,numgr,mu_num,i,pic2d)
 
          deallocate(tp_gy2dsend_head)
        end do

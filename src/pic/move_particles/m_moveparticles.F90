@@ -21,7 +21,7 @@ module m_moveparticles
   use m_picutilities, only: mpi2d_alltoallv_send_particle_2d
   use paradata_utilities, only: compute_process_of_point_per_per
 
-  use m_para_orbit, only: borissolve, fulrk4solve,boris_single
+  use m_para_orbit, only: borissolve, fulrk4solve,boris_single_per_per
   implicit none
 
   public :: new_list_ful2d_per_per, &

@@ -88,7 +88,7 @@ end if
         do i=1,numdim
           num1 = modulo(i,pic2d%layout2d%global_sz1)
           num2 = (i-num1)/pic2d%layout2d%global_sz1+1 
-          buf2(i,i)=buf2(i,i)+1.0_f64/pamearray%temp_i(num1,num2)+1.0_f64/pamearray%temp_e(num1,num2)
+          buf2(i,i)=buf2(i,i)+1.0_f64/pic2d%para2d%temp_i(num1,num2)+1.0_f64/pic2d%para2d%temp_e(num1,num2)
         end do
 
 

@@ -138,6 +138,7 @@ contains
         end do 
 
          write(fileitem, *) iter_num,outarrayone(:)
+!         print*, outarrayone(1:5),outarrayone((numtot/numgr)*(numgr+1))
          deallocate(outarrayone)
       end if
 

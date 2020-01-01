@@ -18,7 +18,8 @@ module field_initialize
        magfield_2d_interpolation_point, &
        para_initialize_field_2d_mesh, &
        test_trigonfun, &
-       test_equdistr
+       test_equdistr, &
+       initialize_magfield
 
 contains
 
@@ -236,15 +237,12 @@ contains
   subroutine para_initialize_field_2d_mesh(amp,amp_eq,wave_one, wave_two, pic2d)
       class(pic_para_total2d_base), pointer,intent(inout) :: pic2d
       real8, intent(in) :: amp,amp_eq,wave_one,wave_two
-!      real8, intent(in) :: contr
       character(25) :: geometry,boundary
       real8 :: x(2),x1(2),delta(2),xmin(2),xmax(2)
       int4 :: ND(2),rank,global_sz(2),comm,coords(2),numproc(2)
       int4 :: i, j
   
       character(25) :: epkind="eqp_sin"
-!      character(25) :: epkind="eqp_linear"
-
 
       comm=pic2d%layout2d%collective%comm
       numproc=pic2d%para2d%numproc
@@ -324,12 +322,25 @@ contains
 
   end subroutine para_initialize_field_2d_mesh
 
+   subroutine initialize_magfield(pic2d)
+     class(pic_para_total2d_base), pointer,intent(inout) :: pic2d      
+     int4 :: ND(2)
+     int4 :: i,j
+
+      ND(1)=pic2d%para2d%m_x1%nodes
+      ND(2)=pic2d%para2d%m_x2%nodes
+      do j=1,Nd(2)+1
+        do i=1, Nd(1)+1
+          pic2d%field2d%bf03(i,j)=1.0_f64
+        enddo
+      end do
+   end subroutine initialize_magfield
 
    function test_equdistr(y,sigma,mean,equdistr)
      real8, intent(in) :: y(2), sigma,mean(2)
      character(len=*), intent(in) :: equdistr
      real8 :: test_equdistr     
-
+     
      select case(equdistr)
        case("flat")
           test_equdistr= 1.0

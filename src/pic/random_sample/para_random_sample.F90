@@ -25,7 +25,8 @@ module para_random_sample
            para_accprej_gaus1d2v_fulgyro_unifield_per_per, &
            congru_accprej_gaus1d2v_fulgyro_unifield_per_per, &
    !        congru_accprej_flatpert2d2v_fulgyro_unifield_per_per, &
-           congru_accprej_2d2v_fulgyro_unifield_per_per
+           congru_accprej_2d2v_fulgyro_unifield_per_per, &
+           congru_accprej_2d2v_per_per_ful
   
 contains
 
@@ -710,7 +711,7 @@ contains
 !        case default
 !          stop
 !      end select
-          call congru_sampling_kernel_trigonometry(v,size,k_hi,m,an,bn,c,y,yf,pymax,mean,eqdistr,pic2d)
+          call congru_sampling_kernel_trig_fulgy(v,size,k_hi,m,an,bn,c,y,yf,pymax,mean,eqdistr,pic2d)
 
         rank1=compute_process_of_point_per_per(y,pic2d%para2d%numproc,pic2d%para2d%gxmin, &
                 pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)
@@ -777,7 +778,119 @@ contains
 !    deallocate(munum_partion)
    end subroutine congru_accprej_2d2v_fulgyro_unifield_per_per  
 
-   subroutine congru_sampling_kernel_trigonometry(v,size,k_hi,m,an,bn,c,y,yf,pmax,mean,eqdistr,pic2d) 
+
+  subroutine congru_accprej_2d2v_per_per_ful(ful2d_head,pic2d,eqdistr,vmin,vmax)
+    class(pic_para_total2d_base), pointer :: pic2d
+    class(ful2d_node), pointer, intent(inout) :: ful2d_head
+    class(ful2dsend_node), dimension(:),pointer :: ful2dsend_head, fulcur
+    character(len=*),intent(in) :: eqdistr
+    real8 :: mean(2),yf(4),py,pymax(2),x,x1,py1,gmin(2),gmax(2),mu
+    real8,intent(in) :: vmin(2),vmax(2)
+    int4,dimension(:),pointer :: num
+    class(ful2d_node), pointer :: ful2dtmp
+    real8 :: sigma, coords(4),rho,mumin,mumax,vperp,tempt
+    real8 :: integ
+    int4 :: rank1,numcircle,size,rank,comm
+    int4 :: ierr,i,j,k
+
+    int4 :: sum=0
+
+!!!!!! for congurence sampling
+    integer, parameter :: numsample=20000000
+    integer :: a
+    integer, pointer :: an
+    integer :: b
+    integer, pointer :: bn
+    integer :: c
+    integer :: error
+    integer :: id
+    integer :: h,m
+    integer :: k_hi
+    integer :: u
+    integer :: v
+    real(8) :: ratio
+
+    rank=pic2d%layout2d%collective%rank
+    size=pic2d%layout2d%collective%size
+    comm=pic2d%layout2d%collective%comm
+    numcircle=pic2d%para2d%numcircle
+    sigma=pic2d%para2d%sigma
+    tempt=pic2d%para2d%tempt
+    allocate(num(0:size-1))
+    allocate(fulcur(0:size-1),ful2dsend_head(0:size-1))
+    allocate(an,bn)
+
+    do i=0,size-1
+       allocate(ful2dsend_head(i)%ptr)
+       fulcur(i)%ptr=>ful2dsend_head(i)%ptr
+    end do
+    ful2dtmp=>ful2d_head
+ 
+    num=0
+    gmin=pic2d%para2d%gxmin
+    gmax=pic2d%para2d%gxmax
+    mean(1)=(pic2d%para2d%gxmax(1)+pic2d%para2d%gxmin(1))/2.0_f64
+    mean(2)=(pic2d%para2d%gxmax(2)+pic2d%para2d%gxmin(2))/2.0_f64      
+
+    if(.not.associated(ful2d_head)) then
+      print*, "ful2d_head is not allocated"
+      stop
+    end if
+
+!!!!!!+++++++++++++++++++++
+!!!! The begining of congurence sampling
+    a = 16807
+    b = 0
+    c = 2147483647
+   
+    k_hi = size*numsample
+
+    call lcrg_anbn(a, b, c, size,an, bn)
+
+    v = 12345
+    h = 1
+
+    do while(h.le.rank)
+      u=v
+      v=lcrg_evaluate(a,b,c,u)
+      h=h+1
+    end do
+
+    m=rank+size 
+ 
+    pymax(1)=1.0+2.0*pic2d%para2d%amp
+    pymax(2)=1.0/sqrt(2.0*pi_)
+
+    do i=1, pic2d%para2d%numparticles     
+
+          call congru_sampling_kernel_trig_ful(v,size,k_hi,m,an,bn,c,yf,pymax,mean,vmin,vmax,eqdistr,pic2d)
+          rank1=compute_process_of_point_per_per(yf(1:2),pic2d%para2d%numproc,pic2d%para2d%gxmin, &
+               pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)           
+
+          if(rank1==rank) then
+            ful2dtmp%coords(1:4)=yf(1:4)
+            allocate(ful2dtmp%next)
+            ful2dtmp=>ful2dtmp%next
+            num(rank)=num(rank)+1           
+          else
+            fulcur(rank1)%ptr%coords(1:4)=yf(1:4)
+            num(rank1)=num(rank1)+1 
+            allocate(fulcur(rank1)%ptr%next)
+            fulcur(rank1)%ptr=>fulcur(rank1)%ptr%next
+          end if
+     end do
+
+
+    call mpi2d_alltoallv_send_particle_2d(ful2d_head,ful2dsend_head,num,pic2d)
+
+    deallocate(ful2dsend_head)
+ 
+   
+    deallocate(num)
+  end subroutine congru_accprej_2d2v_per_per_ful  
+
+
+   subroutine congru_sampling_kernel_trig_fulgy(v,size,k_hi,m,an,bn,c,y,yf,pmax,mean,eqdistr,pic2d) 
      class(pic_para_total2d_base), intent(in) :: pic2d
      int4, intent(in) :: size,k_hi,an,bn,c
      real8, intent(in) :: mean(2)
@@ -833,35 +946,8 @@ contains
       end do
         yf=y
 
-!      case("flat")
-!        u=v
-!        v=lcrg_evaluate(an,bn,c,u)
-!        m=m+size
-!        if(m.ge.k_hi) then
-!          print*, "#ERROR: the inital given sampling number is nesseary."
-!          stop
-!        endif
-!        ratio=real(v,8)/real(c,8)
-!        y(2)=gmin(2)+(gmax(2)-gmin(2))*ratio
-!
-!        u=v
-!        v=lcrg_evaluate(an,bn,c,u)
-!        m=m+size
-!        if(m.ge.k_hi) then
-!          print*, "#ERROR: the inital given sampling number is nesseary."
-!          stop
-!        endif
-!        ratio=real(v,8)/real(c,8)
-!        y(1)=gmin(1)+(gmax(1)-gmin(1))*ratio
-!
-!        yf=y
-!
-!      case default
-!        stop
-!
-!      end select
 
-   end subroutine
+   end subroutine congru_sampling_kernel_trig_fulgy
 
    subroutine congru_sampling_kernel_flat(v,size,k_hi,m,an,bn,c,y,yf,pmax,pic2d)
      class(pic_para_total2d_base), intent(in) :: pic2d
@@ -896,5 +982,91 @@ contains
 
         yf=y
    end subroutine congru_sampling_kernel_flat
+
+   subroutine congru_sampling_kernel_trig_ful(v,size,k_hi,m,an,bn,c,yf,pymax,mean,vmin,vmax,eqdistr,pic2d) 
+     class(pic_para_total2d_base), intent(in) :: pic2d
+     int4, intent(in) :: size,k_hi,an,bn,c
+     real8, intent(in) :: mean(2),vmin(2),vmax(2)
+     character(len=*), intent(in) :: eqdistr
+     int4 :: m,v
+     real(8), intent(in) :: pymax(2)
+     real(8), intent(inout) :: yf(4)
+
+     real(8) :: gmin(2),gmax(2),amp,waveone,wavetwo,y(4)
+     int4 :: u
+     real(8) :: ratio,x,py
+
+     gmin=pic2d%para2d%gxmin
+     gmax=pic2d%para2d%gxmax
+     amp=pic2d%para2d%amp
+     waveone=pic2d%para2d%waveone
+     wavetwo=pic2d%para2d%wavetwo
+ 
+     call congru_seed(v,an,bn,c,m,size,k_hi) 
+     ratio=real(v,8)/real(c,8)
+     y(1)=gmin(2)+(gmax(2)-gmin(2))*ratio    !generate_random_number()
+
+      x=1.0
+      py=0.0
+      do while(x.gt.py)
+        call congru_seed(v,an,bn,c,m,size,k_hi)
+        ratio=real(v,8)/real(c,8)
+        y(2)=gmin(1)+(gmax(1)-gmin(1))*ratio
+        py=test_trigonfun(y(1:2),amp,waveone,wavetwo,pic2d%para2d%sigma,mean,eqdistr)
+
+        call congru_seed(v,an,bn,c,m,size,k_hi)
+        ratio=real(v,8)/real(c,8)        
+        x=pymax(1)*ratio
+      end do
+
+      x=1.0 
+      py=0.0
+      do while(x.gt.py)
+        call congru_seed(v,an,bn,c,m,size,k_hi)
+        ratio=real(v,8)/real(c,8)
+        y(3)=vmin(1)+(vmax(1)-vmin(1))*ratio
+        py=exp(-y(3)**2)/sqrt(2.0*pi_)
+        
+        call congru_seed(v,an,bn,c,m,size,k_hi)
+        ratio=real(v,8)/real(c,8)
+        x=pymax(2)*ratio
+      end do
+
+      x=1.0
+      py=0.0
+      do while(x.gt.py)
+        call congru_seed(v,an,bn,c,m,size,k_hi)
+        ratio=real(v,8)/real(c,8)
+        y(4)=vmin(1)+(vmax(1)-vmin(1))*ratio
+        py=exp(-y(4)**2)/sqrt(2.0*pi_)
+
+        call congru_seed(v,an,bn,c,m,size,k_hi)
+        ratio=real(v,8)/real(c,8)
+        x=pymax(2)*ratio
+      end do
+       
+        yf=y
+
+
+   end subroutine congru_sampling_kernel_trig_ful
+
+   
+   subroutine congru_seed(v,an,bn,c,m,size,k_hi)
+     int4, intent(in) :: an,bn,c,size,k_hi
+     int4, intent(inout) :: v,m
+     int4 :: u
+     
+     u=v
+     v=lcrg_evaluate(an,bn,c,u)
+     m=m+size
+     if(m.ge.k_hi) then
+          print*, "#ERROR: the inital given sampling number is not big enough."
+          stop
+     endif
+
+   end subroutine
+
+
+
 
 end module para_random_sample

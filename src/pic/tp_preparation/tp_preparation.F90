@@ -41,6 +41,9 @@ contains
    rank=pic2d%layout2d%collective%rank
    size=pic2d%layout2d%collective%size
  
+   numleft_boris=0
+   numleft_rk4=0
+   numleft_gy=0
    allocate(tpful2dsend_head(0:size-1),tpful2dsendtmp(0:size-1),tprk4ful2dsend_head(0:size-1), &
            tprk4ful2dsendtmp(0:size-1),tpgy2dsendtmp(0:size-1))
    allocate(num_boris(0:size-1),num_rk4(0:size-1),num_gy(0:size-1))
@@ -113,6 +116,7 @@ contains
 !       call coordinates_pointoutbound_per_per(coords(1:2),pic2d)
         rank1=compute_process_of_point_per_per(coords(1:2),pic2d%para2d%numproc,pic2d%para2d%gxmin,&
              pic2d%para2d%gxmax, pic2d%para2d%gboxmin,pic2d%para2d%gboxmax)
+
         if(rank1==rank) then
           tpful2dtmp%coords(1:4)=coords(1:4)
           tpful2dtmp%tp=j+1
@@ -143,8 +147,9 @@ contains
       end do
    end if
 
-       call tp_mpi2d_alltoallv_send_particle_2d_gy(tpgy2dmu_head,numleft_gy(i),tpgy2dsend_head, &
-                                                num_gy,numgr_gy,1,pic2d)
+      call tp_mpi2d_alltoallv_send_particle_2d_gy(tpgy2dmu_head,numleft_gy(i),tpgy2dsend_head, &
+                                                num_gy,numgr_gy,mu_num,i,pic2d)
+
        deallocate(tpgy2dsend_head)
 
   end do   !!!! end mu_num

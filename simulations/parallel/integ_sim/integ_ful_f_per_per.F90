@@ -1,4 +1,4 @@
-Program integ_per_per
+Program integ_ful_f_per_per
 #include "work_precision.h"
 use constants, only: pi_
 use cartesian_mesh,   only: cartesian_mesh_1d, &
@@ -251,7 +251,9 @@ include "mpif.h"
 
     allocate(tpgy2dmu_head(1),tpgy2dmutmp(1))
     allocate(tpgy2dmu_head(1)%ptr)
-    allocate(numleft_gy(mu_num))
+
+
+!    allocate(numleft_gy(mu_num))
 
 !    allocate(mugyfileitems(mu_num))
 
@@ -268,6 +270,7 @@ include "mpif.h"
 !   munum_partition=0
     allocate(ful2d_head)
     allocate(gy2dmu_head(1:mu_num),gy2dmutmp(1:mu_num)) 
+    allocate(numleft_gy(1))
  
     do i=1, mu_num
       allocate(gy2dmu_head(i)%ptr, gy2dmutmp(i)%ptr)
@@ -300,9 +303,18 @@ include "mpif.h"
     global_sz(1)=pic2d%layout2d%global_sz1
     global_sz(2)=pic2d%layout2d%global_sz2
 
+!    allocate(pic2d%para2d%temp_i(global_sz(1),global_sz(2)), &
+!             pic2d%para2d%temp_e(global_sz(1),global_sz(2)))
+!
+!    do j=1,global_sz(1)
+!      do i=1,global_sz(2)
+!         pic2d%para2d%temp_e(i,j)=pic2d%para2d%tempt
+!         pic2d%para2d%temp_i(i,j)=pic2d%para2d%tempt
+!      end do
+!    enddo
      pamearray=>allocate_parameters_array_2d(mu_num,global_sz(1:2))
 
-   call initialize_parameters_2d(pic2d,pamearray) 
+   call initialize_parameters_2d(pic2d,global_sz) 
    call initialize_parameters_array_2d(pic2d%para2d%mumax,mu_num,pic2d%para2d%mu_scheme,pamearray, &
         mu_nodes,mu_weights,munum_partition,pic2d%para2d%tempt)  
 
@@ -452,15 +464,15 @@ endif
   ND(1) = pic2d%para2d%m_x1%nodes
   ND(2) = pic2d%para2d%m_x2%nodes
 
-!        do j=1,ND(2)
-!          do k=1,ND(1)
-!            pic2d%field2d%denf(k,j)=(pic2d%field2d%denf(k,j)-pic2d%field2d%denfeq(k,j))/pic2d%field2d%denfeq(k,j)
-!          end do
-!        enddo
+        do j=1,ND(2)
+          do k=1,ND(1)
+            pic2d%field2d%dengtot(k,j)=(pic2d%field2d%denf(k,j)-pic2d%field2d%denfeq(k,j))/pic2d%field2d%denfeq(k,j)
+          end do
+        enddo
 
-!call para_write_field_file_2d(pic2d%field2d%denf,50,rootdata,pic2d)
+call para_write_field_file_2d(pic2d%field2d%dengtot,50,rootdata,pic2d)
 !
-!call solve_field_ful(rootdata,pic2d,pamearray)
+call solve_field_ful(rootdata,pic2d,pamearray)
 !        call solve_weight_of_field_among_processes(pic2d%field2d%ep,rootdata,pic2d, &
 !        pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n,&
 !        pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
@@ -472,7 +484,7 @@ endif
 !endif
 
 
-  do i=1, 300  !pic2d%para2d%iter_number
+  do i=1, 100  !pic2d%para2d%iter_number
     if(rank==0) then
       print*, "#iter_number=", i
     endif
@@ -498,11 +510,11 @@ endif
 !       if(rank==0) then
 !         print*, "#j=",j
 !       endif
-        call solve_field_ful(rootdata,pic2d,pamearray)
- 
-        if(modulo(i,3)==0) then
+        if(modulo(i,3)==1) then
           call para_write_field_file_2d(pic2d%field2d%ep,fileitemep_boris,rootdata,pic2d)
         endif
+
+
 !        do j=1,ND(2)
 !          do k=1,ND(1)
 !            pic2d%field2d%denf(k,j)=(pic2d%field2d%denf(k,j)-pic2d%field2d%denfeq(k,j))/pic2d%field2d%denfeq(k,j)
@@ -519,6 +531,7 @@ endif
 
         call partition_density_to_grid_ful(ful2d_head,pic2d)
 
+         call solve_field_ful(rootdata,pic2d,pamearray)
   
         call move_print_tp_particles(tpful2d_head,numleft_boris, &
              numgr,40,j,"boris",pic2d)
@@ -538,5 +551,5 @@ endif
     if(rank==0) then
       print*, "#The simultion is finished."
     endif  
-end program  integ_per_per
+end program  integ_ful_f_per_per
 

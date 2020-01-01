@@ -115,7 +115,7 @@ contains
 !       endif
        do i= 1,num1
          do j=1,num2
-            pic2d%field2d%ep(i,j)=pic2d%field2d%ep(i,j)*pamearray%temp_e(i,j)/ &
+            pic2d%field2d%ep(i,j)=pic2d%field2d%ep(i,j)*pic2d%para2d%temp_e(i,j)/ &
                                     pic2d%field2d%denfeq(i,j) 
          end do
        enddo

@@ -61,8 +61,8 @@ contains
      int4, intent(in) :: mu_num, global_sz(2)
 
      allocate(pamearray)
-     allocate(pamearray%temp_i(global_sz(1),global_sz(2)))
-     allocate(pamearray%temp_e(global_sz(1),global_sz(2)))
+!     allocate(pamearray%temp_i(global_sz(1),global_sz(2)))
+!     allocate(pamearray%temp_e(global_sz(1),global_sz(2)))
      allocate(pamearray%mu_nodes(mu_num))
      allocate(pamearray%mu_weights(mu_num))
      allocate(pamearray%munum_partition(mu_num))
@@ -332,9 +332,9 @@ contains
 
   end subroutine
 
-   subroutine initialize_parameters_2d(pic2d,pamearray)
+   subroutine initialize_parameters_2d(pic2d,global_sz)
       class(pic_para_total2d_base), pointer, intent(inout) :: pic2d
-      class(parameters_array_2d), pointer, intent(inout) :: pamearray
+      int4, intent(in) :: global_sz(2)
       int4 :: i,j,startind(2),size1,rank,k,size
       real8 :: dmu,delta(2)
       
@@ -385,6 +385,15 @@ contains
 !       call muarray_euler_maclaurin_choice(pic2d%para2d%mumax,pic2d%para2d%mu_num, &
 !                                           pamearray%mu_nodes,pamearray%mu_weights,pic2d%para2d%mu_scheme)
 
+        allocate(pic2d%para2d%temp_i(global_sz(1),global_sz(2)), &
+             pic2d%para2d%temp_e(global_sz(1),global_sz(2)))
+
+       do j=1,global_sz(2)
+         do i=1,global_sz(1)
+           pic2d%para2d%temp_e(i,j)=pic2d%para2d%tempt
+           pic2d%para2d%temp_i(i,j)=pic2d%para2d%tempt
+         end do
+       enddo
    end subroutine initialize_parameters_2d
 
 
@@ -399,19 +408,19 @@ contains
 !     allocate(mu_nodes(mu_num+1),mu_weights(mu_num+1))
 !     call muarray_euler_maclaurin_choice(mumax,mu_num+1,  &
 !                                         mu_nodes,mu_weights,mu_scheme)
-     numdim=size(pamearray%temp_i,1)
+!     numdim=size(pamearray%temp_i,1)
 
      pamearray%mu_nodes(1:mu_num)=mu_nodes(1:mu_num)
      pamearray%mu_weights(1:mu_num)=mu_weights(1:mu_num)
      pamearray%munum_partition(1:mu_num)=munum_partition(1:mu_num)
  !    deallocate(mu_nodes,mu_weights) 
 
-     do i=1,numdim
-       do j=1, numdim
-          pamearray%temp_i(i,j)=temp
-          pamearray%temp_e(i,j)=temp
-       enddo
-     enddo
+!     do i=1,numdim
+!       do j=1, numdim
+!          pamearray%temp_i(i,j)=temp
+!          pamearray%temp_e(i,j)=temp
+!       enddo
+!     enddo
    end subroutine  initialize_parameters_array_2d
 
    subroutine computing_mu_number(mu_nods,mu_weigs,munum_part,mu_num,pic2d)

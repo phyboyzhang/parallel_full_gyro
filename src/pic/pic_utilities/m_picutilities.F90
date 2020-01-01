@@ -1362,12 +1362,12 @@ contains
    end subroutine tp_mpi2d_alltoallv_send_particle_2d
 
  subroutine tp_mpi2d_alltoallv_send_particle_2d_gy(tp_gy2dmu_head,numleft, &
-             tp_gy2dsend_head,num,numgr,muind,pic2d)
+             tp_gy2dsend_head,num,numgr,mu_num,muind,pic2d)
     class(pic_para_total2d_base), pointer :: pic2d
     class(tp_gy2dsend_node), dimension(:), pointer, intent(in) :: tp_gy2dsend_head
     class(tp_gy2dallmu_node),dimension(:), pointer,intent(inout)  :: tp_gy2dmu_head
     int4, dimension(:), pointer, intent(in) :: num
-    int4, intent(in) :: muind
+    int4, intent(in) :: muind,mu_num
     int4, intent(inout) :: numleft
     int4, intent(in) :: numgr
     int4, dimension(:),pointer :: rcounts,scounts,sdispls,rdispls
@@ -1375,12 +1375,11 @@ contains
     class(tp_gy2dsend_node),dimension(:), pointer :: rankcur
     class(tp_gy2dallmu_node),dimension(:),   pointer :: coordcur
     int4 :: i,j,h,ierr,rank,size,comm, nums,numre
-    int4 :: mu_num 
- 
+
     rank=pic2d%layout2d%collective%rank
     size=pic2d%layout2d%collective%size
     comm=pic2d%layout2d%collective%comm
-    mu_num=pic2d%para2d%mu_num
+!    mu_num=pic2d%para2d%mu_num
     allocate(coordcur(1:mu_num))
     do i=1,mu_num
       coordcur(i)%ptr=>tp_gy2dmu_head(i)%ptr 
@@ -1478,7 +1477,7 @@ contains
               exit
             end if
           end do
-40        end if
+40      end if
     end do
       call mpi_alltoallv(sbuf,scounts,sdispls,mpi_double_precision,rbuf,rcounts,rdispls, &
                         mpi_double_precision,comm,ierr)

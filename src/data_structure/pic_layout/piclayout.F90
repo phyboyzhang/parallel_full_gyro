@@ -58,11 +58,12 @@ module piclayout
      real8 :: waveone,wavetwo
 !     real8, dimension(:),pointer :: mu_nodes,mu_weights
 !     real8, dimension(:,:),pointer :: temp_i,temp_e
+     real8, dimension(:,:),pointer :: temp_i,temp_e
+  
   end type parameters_set_2d
 
   type parameters_array_2d
      real8, dimension(:),pointer :: mu_nodes,mu_weights
-     real8, dimension(:,:),pointer :: temp_i,temp_e
      int4, dimension(:), pointer :: munum_partition
   end type parameters_array_2d
 !!                    north
