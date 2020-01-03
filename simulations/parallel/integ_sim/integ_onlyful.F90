@@ -363,11 +363,11 @@ endif
 !!!!!!======: initialize the test particle linked list
    numgr=5
    numgr_gy=4
-   call initialize_test_particles(tpful2d_head,tprk4ful2d_head,tpgy2dmu_head, &
-            numleft_boris,numleft_rk4,numleft_gy,numgr,numgr_gy,1,pic2d)
-if(rank==0) then
-print*, "#The initialization of the test particles begins."
-endif
+!   call initialize_test_particles(tpful2d_head,tprk4ful2d_head,tpgy2dmu_head, &
+!            numleft_boris,numleft_rk4,numleft_gy,numgr,numgr_gy,1,pic2d)
+!if(rank==0) then
+!print*, "#The initialization of the test particles begins."
+!endif
 
 !!!!!=============
 
@@ -430,9 +430,10 @@ endif
 !print*, "rank=",rank,pic2d%field2d%ep_weight
 !print*,
 !endif
+  
+  rk4order=2
 
-
-  do i=1, 400  !pic2d%para2d%iter_number
+  do i=1, 50  !pic2d%para2d%iter_number
     if(rank==0) then
       print*, "#iter_number=", i
     endif
@@ -458,9 +459,10 @@ endif
 !       if(rank==0) then
 !         print*, "#j=",j
 !       endif
-        if(modulo(i,5)==1) then
+!        if(modulo(i,3)==1) then
           call para_write_field_file_2d(pic2d%field2d%ep,fileitemep_boris,rootdata,pic2d)
-        endif
+!          call para_write_field_file_2d(pic2d%field2d%ep,fileitemep_rk4,rootdata,pic2d)
+!        endif
 
 
 !        do j=1,ND(2)
@@ -476,20 +478,21 @@ endif
         pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n,&
         pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
         pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
-if(i==0) then
-  call elef_at_grids_2d(elefbox,pic2d)
-if(rank==0) then
-!  print*, "elefbox(1,:,:)", elefbox(1,:,:)
-
-  print*, "elefbox(2,:,:)", elefbox(2,:,:)
-!  print*, "bf=", pic2d%field2d%BF03wg
-endif
-endif
+!if(i==2) then
+!  call elef_at_grids_2d(elefbox,pic2d)
+!if(rank==0) then
+!!  print*, "elefbox(1,:,:)", elefbox(1,:,:)
+!
+!  print*, "elefbox(2,:,:)", elefbox(2,:,:)
+!!  print*, "bf=", pic2d%field2d%BF03wg
+!endif
+!endif
 
         call move_print_tp_particles(tpful2d_head,numleft_boris, &
              numgr,40,j,"boris",pic2d)
  
         call borissolve_and_sort(ful2d_head,pic2d)
+!        call fulrk4solve_and_sort(ful2d_head,pic2d,rk4order,i)
 
         call partition_density_to_grid_ful(ful2d_head,pic2d)
 

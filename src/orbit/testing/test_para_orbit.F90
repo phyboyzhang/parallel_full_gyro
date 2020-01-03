@@ -105,7 +105,7 @@ include "mpif.h"
     real8 :: trap_coord(4,2),ptc_ratio(4)   
 
     class(ful2d_node),pointer :: curful
-    class(ful2dsend_node), dimension(:),pointer ::currk
+    class(ful2dsend_node), dimension(:),pointer ::currk, ful2dsend_head
     class(gy2d_node), pointer :: gy2d_head,gy2dtmp
     class(gy2dsend_node), dimension(:), pointer :: gy2dsend_head, gy2dsendtmp
     real8 :: coords(4)   
@@ -305,8 +305,11 @@ call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
    gy2dmutmp(1)%ptr=>gy2dmu_head(1)%ptr
     allocate(currk(0:size-1))
     allocate(gy2dsendtmp(0:size-1),gy2dsend_head(0:size-1))
-    do i=0,size-1
-       currk(i)%ptr=>pic2d%ful2dsend_head(i)%ptr
+    allocate(ful2dsend_head(0:size-1))    
+
+    do i=0,size-1 
+       allocate(ful2dsend_head(i)%ptr)
+       currk(i)%ptr=>ful2dsend_head(i)%ptr
        allocate(gy2dsend_head(i)%ptr)
        gy2dsendtmp(i)%ptr=>gy2dsend_head(i)%ptr
     end do
@@ -314,7 +317,7 @@ call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
 !     goto 10 
 !   else
 
-   gy2dmutmp(1)%ptr=>gy2dmu_head(1)%ptr
+!   gy2dmutmp(1)%ptr=>gy2dmu_head(1)%ptr
    num_gy=0
 
    do j=1,pic2d%para2d%m_x1%nodes-1
@@ -374,17 +377,17 @@ call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
    end do
 !10  end if
 print*, rank
-call mpi_barrier(comm)
+!call mpi_barrier(comm)
    do i=0,size-1
-     currk(i)%ptr=>pic2d%ful2dsend_head(i)%ptr
+     currk(i)%ptr=>ful2dsend_head(i)%ptr
      gy2dsendtmp(i)%ptr=>gy2dsend_head(i)%ptr
    end do
    ful2dtmp=>ful2d_head
    gy2dtmp=>gy2d_head
    call mpi2d_alltoallv_send_particle_2d(ful2dtmp,currk,num_p,pic2d)
-
-   call mpi2d_alltoallv_send_particle_2d_gy(gy2dmu_head,gy2dsend_head,num_gy,1,pic2d)
-
+print*, "rank=",rank
+!   call mpi2d_alltoallv_send_particle_2d_gy(gy2dmu_head,gy2dsend_head,num_gy,1,pic2d)
+print*, "rank1=",rank
 
 
 !   ful2dtmp=>ful2d_head
@@ -519,10 +522,11 @@ call mpi_barrier(comm)
 
   rk4order=4
 
+
   do i=1, 100
-!   if(rank==0) then
-!   print*, "#iter_numeber=", i
-!   end if
+   if(rank==0) then
+   print*, "#iter_numeber=", i
+   end if
 !   ful2dtmp=>ful2d_head 
    call fulrk4solve(ful2dtmp,pic2d,rk4order,i)
 !   ful2dtmp=>ful2d_head

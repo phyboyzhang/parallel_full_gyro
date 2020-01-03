@@ -484,7 +484,7 @@ call solve_field_ful(rootdata,pic2d,pamearray)
 !endif
 
 
-  do i=1, 100  !pic2d%para2d%iter_number
+  do i=1, 17  !pic2d%para2d%iter_number
     if(rank==0) then
       print*, "#iter_number=", i
     endif
@@ -510,9 +510,9 @@ call solve_field_ful(rootdata,pic2d,pamearray)
 !       if(rank==0) then
 !         print*, "#j=",j
 !       endif
-        if(modulo(i,3)==1) then
+!        if(modulo(i,3)==1) then
           call para_write_field_file_2d(pic2d%field2d%ep,fileitemep_boris,rootdata,pic2d)
-        endif
+!        endif
 
 
 !        do j=1,ND(2)

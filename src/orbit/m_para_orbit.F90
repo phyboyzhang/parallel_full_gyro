@@ -407,12 +407,13 @@ subroutine borissolve(ful2d_head,pic2d,numleft)
     int4, intent(in) :: rk4order, iter_num
     class(ful2dsend_node), dimension(:), pointer :: ful2dsend_head
     int4, dimension(:), pointer :: num
-    int4 :: csize, i
+    int4 :: csize, i,rank
 
+    rank=pic2d%layout2d%collective%rank
     csize=pic2d%layout2d%collective%size
     allocate(ful2dsend_head(0:csize-1), num(0:csize-1))
-    do i=1,csize
-      allocate(ful2dsend_head(i))
+    do i=0,csize-1
+      allocate(ful2dsend_head(i)%ptr)
     enddo
     num=0  
     call fulrk4solve(ful2d_head,pic2d,rk4order,iter_num)
@@ -420,7 +421,7 @@ subroutine borissolve(ful2d_head,pic2d,numleft)
     call sort_particles_among_ranks(ful2d_head,ful2dsend_head, pic2d, num)
   
     call mpi2d_alltoallv_send_particle_2d(ful2d_head,ful2dsend_head,num,pic2d) 
-   
+  
     deallocate(ful2dsend_head,num)
   end subroutine fulrk4solve_and_sort
 
