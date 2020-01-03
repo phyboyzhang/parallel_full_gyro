@@ -491,14 +491,9 @@ endif
         call move_print_tp_particles(tpful2d_head,numleft_boris, &
              numgr,40,j,"boris",pic2d)
  
-<<<<<<< HEAD
         call borissolve_and_sort(ful2d_head,pic2d)
 !        call fulrk4solve_and_sort(ful2d_head,pic2d,rk4order,i)
 
-=======
-!        call borissolve_and_sort(ful2d_head,pic2d)
-        call fulrk4solve_and_sort(ful2d_head,pic2d,rk4order,i)
->>>>>>> delta_f
         call partition_density_to_grid_ful(ful2d_head,pic2d)
 
         call solve_field_ful(rootdata,pic2d,pamearray)
