@@ -1,0 +1,3 @@
+add_executable(integral_of_distr integral_of_distr.F90)
+
+target_link_libraries(integral_of_distr field_test)

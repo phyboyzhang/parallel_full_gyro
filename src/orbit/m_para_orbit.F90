@@ -415,13 +415,14 @@ subroutine borissolve(ful2d_head,pic2d,numleft)
     do i=0,csize-1
       allocate(ful2dsend_head(i)%ptr)
     enddo
-    num=0  
+    num=0 
+
     call fulrk4solve(ful2d_head,pic2d,rk4order,iter_num)
 
     call sort_particles_among_ranks(ful2d_head,ful2dsend_head, pic2d, num)
-  
+ 
     call mpi2d_alltoallv_send_particle_2d(ful2d_head,ful2dsend_head,num,pic2d) 
-  
+
     deallocate(ful2dsend_head,num)
   end subroutine fulrk4solve_and_sort
 
