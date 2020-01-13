@@ -1385,24 +1385,30 @@ subroutine borissolve(ful2d_head,pic2d,numleft)
       class(gy2dmu_node),dimension(:), pointer, intent(inout) :: gy2dmu_head
       int4, intent(in) :: iter_num
       class(gy2dsend_node), dimension(:),pointer :: gy2dsend_head
-      int4 :: csize, mu_num, i,j
+      int4 :: csize, mu_num, i,j,rank
       int4, dimension(:), pointer :: num
 
+      rank=pic2d%layout2d%collective%rank
       csize=pic2d%layout2d%collective%size
       mu_num=pic2d%para2d%mu_num
       allocate(num(0:csize-1))
       
+      call gyrork4solveallmu(gy2dmu_head,pic2d,iter_num)
+
       do i=1,mu_num
         allocate(gy2dsend_head(0:csize-1))
         num=0
         do j=0,csize-1
           allocate(gy2dsend_head(j)%ptr)
         end do
+
         call sort_particles_among_ranks_gyallmu(gy2dmu_head,gy2dsend_head,i,pic2d, num) 
+ 
         call mpi2d_alltoallv_send_particle_2d_gy(gy2dmu_head,gy2dsend_head,num,i,pic2d)
+!print*, "i2=",i,"rank2=",rank
+        deallocate(gy2dsend_head) 
       enddo 
 
-     deallocate(num,gy2dsend_head) 
    end subroutine gyrork4solveallmu_and_sort
 
    subroutine para_obtain_interpolation_elefield_per_per_ful(x1, elef, pic2d)

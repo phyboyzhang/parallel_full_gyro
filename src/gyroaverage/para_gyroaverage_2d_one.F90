@@ -300,6 +300,7 @@ contains
 
      case ("double_per")
  !    do m=1,num_mu
+ !!! Here, the rightest and upest lines are not counted for each process. 
      do i=1, Nc(1)-1
          x1(1)=pic2d%para2d%gboxmin(rank,1)+real(i-1,8)*pic2d%para2d%m_x1%delta_eta 
          do j=1, Nc(2)-1 
@@ -424,9 +425,7 @@ contains
           sbuf(5*h+4)=real(curpoint(i)%ptr%gridind(2),8)
           curpoint(i)%ptr=>curpoint(i)%ptr%next
           h=h+1
-!          if(.not.associated(curpoint(i)%ptr%next)) then  !!! This is the last element
-!             goto 50
-!          end if  
+
         end do
 50    end do
 !if(mu_num==20) then
@@ -548,12 +547,6 @@ contains
           end do
         end do
         root=0
-!if(mu_num==9.and.myrank==0) then
-!print*, "rank=",myrank,33*numsend,size(rbuf2nd)
-!!print*, "rank=",myrank, "rcounts=",rcounts
-!!print*, "rank=",myrank, "rdispls=",rdispls
-!!print*, sbuf2nd
-!endif
 
         call MPI_GATHERV(sbuf2nd,33*numsend,MPI_DOUBLE_PRECISION,rbuf2nd,rcounts,rdispls,MPI_DOUBLE_PRECISION,root,comm,ierr) 
 !!! Now, get the global stiff matrix on the root process.    
@@ -563,13 +556,6 @@ contains
           do h=0, numout-1
             do m=-1,2
               do l=-1,2
-          !!!! Tell whether the the point which h denotes for is counted or not to avoid the repeated counting of points at 
-          !!!! the boundary of each box.
-!               IF(rootdata%ACONTRI(NINT(rbuf2nd(33*h)),NINT(rbuf2nd(33*h+4*(m+1)+l+2+16))).ne.0.or. &
-!                  rootdata%ACONTRI(NINT(rbuf2nd(33*h)),NINT(rbuf2nd(33*h+4*(m+1+1)+l+1+2+16))).ne.0.or. &
-!                  rootdata%ACONTRI(NINT(rbuf2nd(33*h)),NINT(rbuf2nd(33*h+4*(m+1+2)+l+2+2+16))).ne.0  ) then
-!                  goto 100 
-!               else
 !        if(mu_num==20) then
 !        print*, rbuf2nd(33*h+4*(m+1)+l+2)
 !        endif
@@ -577,12 +563,10 @@ contains
                   =rootdata%ACONTRI(NINT(rbuf2nd(33*h)),NINT(rbuf2nd(33*h+4*(m+1)+l+2+16))) &
                   +rbuf2nd(33*h+4*(m+1)+l+2)
                  
-
-!               end if
+              end do
             end do
-         end do
-100    end do
-    end if 
+100        end do
+        end if 
 
     deallocate(rcounts,scounts,sdispls,rdispls,rbuf3rd,rbufone,sbuf2nd,rbuf2nd, curpoint) 
        
@@ -1015,7 +999,7 @@ contains
 
 
 
-   subroutine store_data_on_rootprocess(mu,mu_num,rank,rootdata,pic2d)
+   subroutine compute_gyroaverage_matrix(mu,mu_num,rank,rootdata,pic2d)
      class(root_precompute_data), pointer, intent(inout) :: rootdata
      class(pic_para_total2d_base), pointer, intent(in)   :: pic2d
   !   character(len=*), intent(in) :: geometry,boundary
@@ -1064,7 +1048,7 @@ contains
             stop
         end select
 
-   end subroutine store_data_on_rootprocess
+   end subroutine compute_gyroaverage_matrix
 
    subroutine precompute_doublegyroaverage_matrix(rootdata,pic2d,pamearray)
       class(root_precompute_data), pointer, intent(inout) :: rootdata
@@ -1102,7 +1086,7 @@ contains
          mu=pamearray%mu_nodes(j)   
          buf1=0.0 
          rootdata%ACONTRI=0.0  
-         call store_data_on_rootprocess(mu,j,rank,rootdata,pic2d)   
+         call compute_gyroaverage_matrix(mu,j,rank,rootdata,pic2d)   
          if(rank==0) then
            buf1=matmul(rootdata%ACONTRI,rootdata%ASPL)
            do i=1, numdim

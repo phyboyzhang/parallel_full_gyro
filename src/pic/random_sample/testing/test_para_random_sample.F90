@@ -370,7 +370,7 @@ endif
  
 !print*, 3
  !!! and store the equilibrium distirbution on the mesh
-  call partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d)
+  call partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d,1)
 !if(rank==0) then
 !   print*, "pic2d%deng=",pic2d%field2d%deng(3,:,:)
 !end if

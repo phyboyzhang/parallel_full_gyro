@@ -124,7 +124,7 @@ include "mpif.h"
   do i=1,dimsize(1)
     do j=1, dimsize(2)
        globalind=globalind_from_localind_2d((/i,j/),pic2d%para2d%numproc,rank,pic2d%layout2d,pic2d%para2d%boundary)
-       pic2d%field2d%ep(i,j)=real(globalind(1)+globalind(2), 8)
+       pic2d%field2d%ep(i,j)=1.0    !real(globalind(1)+globalind(2), 8)
     end do
   end do
      if(rank==2) then
@@ -156,9 +156,9 @@ call copy_boundary_value_per_per(pic2d%field2d%ep,rank,pic2d%para2d%numproc,pic2
     call gather_field_to_rootprocess_per_per(rootdata%field,pic2d%field2d%ep,rank,size,boxindex,&
           pic2d%para2d%numproc,pic2d%layout2d) 
 
-!    if(rank==0) then
-!       print*, 'rootfield=', rootdata%field
-!    end if
+    if(rank==0) then
+       print*, 'rootfield=', rootdata%field
+    end if
 
     rootdata%field=1
     pic2d%field2d%ep=0._f64

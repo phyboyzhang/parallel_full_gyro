@@ -890,6 +890,7 @@ contains
   end subroutine congru_accprej_2d2v_per_per_ful  
 
 
+
    subroutine congru_sampling_kernel_trig_fulgy(v,size,k_hi,m,an,bn,c,y,yf,pmax,mean,eqdistr,pic2d) 
      class(pic_para_total2d_base), intent(in) :: pic2d
      int4, intent(in) :: size,k_hi,an,bn,c

@@ -356,6 +356,7 @@ end if
        pic2d%field2d%bf03wg_nw,pic2d%field2d%bf03wg_ne)
 
 if(rank==0) then
+print*, pic2d%field2d%bf03wg
 print*, "#precomputing is finished."
 endif
 

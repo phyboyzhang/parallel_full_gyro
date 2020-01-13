@@ -187,7 +187,7 @@ include "mpif.h"
     pic2d%para2d%N_points=20
     pic2d%para2d%iter_number=100
     pic2d%para2d%numcircle=8
-    pic2d%para2d%numparticles=200000
+    pic2d%para2d%numparticles=50000
     pic2d%para2d%dtgy=1.0
     pic2d%para2d%num_time=15
     pic2d%para2d%boundary="double_per"
@@ -203,7 +203,7 @@ include "mpif.h"
     pic2d%para2d%mumin=0.0_f64
     pic2d%para2d%mumax=10._F64
     pic2d%para2d%mu_tail=1000
-    pic2d%para2d%mulast = 40
+    pic2d%para2d%mulast = 5
 !    pic2d%para2d%mu_num=39
     pic2d%para2d%gyroorder=1
     row=pic2d%para2d%row

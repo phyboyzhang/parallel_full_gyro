@@ -1449,7 +1449,7 @@ subroutine gather_field_to_rootprocess_per_per(rootfield,boxfield,rank,size,boxi
      int4 :: i,j,h,ierr,numout,numout1
      int4 :: nx1,nx2,numproc1,numproc2,startgridindex(2),globalind(2),localind(2)
      int4 :: length(2), globnum, num,root, comm,coords(2)
-     
+    
      comm=layout2d%collective%comm
      numout=0
      root=0
@@ -1524,14 +1524,14 @@ subroutine gather_field_to_rootprocess_per_per(rootfield,boxfield,rank,size,boxi
      allocate(rbuf2(0:numout1-1),stat=ierr)
      call mpi_gatherv(sbuf2,3*numout,mpi_double_precision,rbuf2,rcounts,rdispls,mpi_double_precision, &
                      root,comm,ierr)
-  
+
      if(rank==0) then
           h=0
           do i=0,numout1/3-1
              globalind(1)=NINT(rbuf2(i+h+1))
              globalind(2)=NINT(rbuf2(i+h+2))
              globnum=(globalind(2)-1)*layout2d%global_sz1+globalind(1)
-             rootfield(globnum)=rbuf2(i+h)
+             rootfield(globnum)=rbuf2(i+h)         
              h=h+2
           end do
       end if

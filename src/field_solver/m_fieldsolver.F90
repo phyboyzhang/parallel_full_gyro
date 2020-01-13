@@ -20,7 +20,8 @@ public :: solve_weight_of_field_among_processes, &
           compute_gyrodensity_perturbation, &
           compute_equdensity, &
           compute_equdensity_for_gy, &
-          solve_field_ful
+          solve_field_ful, &
+          compute_equdensity_initdistr_gy
 contains
 
   !!! This subroutine is used to solve the weight of field. First, gather
@@ -55,6 +56,9 @@ contains
      end subroutine  solve_weight_of_field_among_processes
 
 
+
+!!!! Here, field2d%gep stores the electrostatic potential on the ful-orbit
+!spatial space.  
      subroutine solve_field_quasi_neutral(rank,rootdata,pic2d,pamearray)
        class(root_precompute_data), pointer, intent(inout) :: rootdata
        class(pic_para_total2d_base), pointer, intent(inout) :: pic2d
@@ -62,7 +66,7 @@ contains
        int4, intent(in) :: rank
        real8, dimension(:), pointer :: density
        int4 :: dims,global_sz(2),sizeone,boxindex(4),num1,num2
-       real8, dimension(:,:), pointer :: buffer
+!       real8, dimension(:,:), pointer :: buffer
        int4 :: i,j
 
        num1=size(pic2d%field2d%dengtot,1)
@@ -72,19 +76,12 @@ contains
        sizeone=pic2d%layout2d%collective%size     
        dims=global_sz(1)*global_sz(2)
        allocate(density(dims))
-       allocate(buffer(num1,num2))
-       
-       do i=1,num1
-         do j=1,num2     
-            buffer(i,j)=pic2d%field2d%dengtot(i,j)/pic2d%field2d%dengeqtot(i,j)
-         end do
-       enddo
+
 !!!!!! Here, it may be required to carry out the gyroaverage of
 !!!pic2d%field2d%deng
        call get_layout_2d_box_index( pic2d%layout2d, rank, boxindex )       
-       call gather_field_to_rootprocess_per_per(density,buffer,rank, &
+       call gather_field_to_rootprocess_per_per(density,pic2d%field2d%dengtot,rank, &
            sizeone,boxindex,pic2d%para2d%numproc,pic2d%layout2d)
-
 
        if(rank==0) then
           rootdata%field=matmul(rootdata%prematrix,density) 
@@ -94,7 +91,7 @@ contains
        call scatter_field_from_rootprocess_per_per(rootdata%field,pic2d%field2d%gep,sizeone, &
             pic2d%para2d%numproc,global_sz,pic2d%layout2d)
 
-       deallocate(density,buffer)
+       deallocate(density)
      end subroutine solve_field_quasi_neutral
 
      subroutine solve_field_ful(rootdata,pic2d,pamearray)
@@ -128,18 +125,26 @@ contains
        class(pic_para_total2d_base), pointer, intent(inout) :: pic2d
        class(parameters_array_2d), pointer, intent(in) :: pamearray
        real8,dimension(:,:),pointer :: buf,box,re,rs,rw,rn,rne,rse,rsw,rnw 
-       int4 :: i,ierr,num1,num2,row 
-
+       int4 :: i,ierr,num1,num2,row, rank
+ 
+       rank=pic2d%layout2d%collective%rank
        num1=size(pic2d%field2d%ep,1)
        num2=size(pic2d%field2d%ep,2)
        row=pic2d%para2d%row
        allocate(buf(num1,num2))       
        allocate(box(num1,num2),rw(num1,row),re(num1,row),rn(row,num2),rs(row,num2), &
              rsw(row,row),rse(row,row),rnw(row,row),rne(row,row),stat=ierr)
-       
+ 
+       pic2d%field2d%epgyro=0.0       
        do i=1,pic2d%para2d%mu_num
 
          call para_compute_gyroaverage_mesh_field(pamearray%mu_nodes(i),i,pic2d)
+ 
+!if(rank==0) then
+!if(i==1.or.i==5) then
+!print*, pic2d%field2d%epgyro(i,:,:)
+!endif
+!endif
          buf=pic2d%field2d%epgyro(i,:,:)
 
          box=0.0
@@ -166,16 +171,21 @@ contains
          pic2d%field2d%epgywg_ne(i,:,:)=rne
       
        end do   
-   
+!if(rank==0) then
+!print*, "i=1",pic2d%field2d%epgyro(1,:,:)
+!print*, 
+!print*, "i=12",pic2d%field2d%epgyro(12,:,:)
+!endif   
        deallocate(buf,box,rw,re,rn,rs,rsw,rse,rnw,rne)
      end subroutine solve_gyfieldweight_from_field
 
 
      subroutine compute_equdensity_for_gy(pic2d)
        class(pic_para_total2d_base), pointer, intent(inout) :: pic2d
-       int4 :: i      
+       int4 :: i,rank      
 !       pic2d%field2d%deng=pic2d%field2d%deng-pic2d%field2d%dengeq
-       pic2d%field2d%dengeqtot(:,:)=0.0
+        rank=pic2d%layout2d%collective%rank
+        pic2d%field2d%dengeqtot(:,:)=0.0
 !       pic2d%field2d%dengeqtot_e(:,:)=0.0
 !       pic2d%field2d%dengeqtot_s(:,:)=0.0
 !       pic2d%field2d%dengeqtot_w(:,:)=0.0
@@ -185,7 +195,10 @@ contains
 !       pic2d%field2d%dengeqtot_sw(:,:)=0.0
 !       pic2d%field2d%dengeqtot_nw(:,:)=0.0       
        do i=1,pic2d%para2d%mu_num
-         pic2d%field2d%dengeqtot=pic2d%field2d%dengeqtot+pic2d%field2d%deng(i,:,:)
+!         if(rank==0) then
+!          print*, "i=",i,pic2d%field2d%dengeq(i,1,1)
+!         endif
+         pic2d%field2d%dengeqtot=pic2d%field2d%dengeqtot+pic2d%field2d%dengeq(i,:,:)
 !         pic2d%field2d%dengeqtot_e=pic2d%field2d%dengeqtot_e+pic2d%field2d%deng_e(i,:,:)
 !         pic2d%field2d%dengeqtot_s=pic2d%field2d%dengeqtot_s+pic2d%field2d%deng_s(i,:,:)
 !         pic2d%field2d%dengeqtot_w=pic2d%field2d%dengeqtot_w+pic2d%field2d%deng_w(i,:,:)
@@ -197,7 +210,7 @@ contains
        end do
  
 
-     end subroutine
+     end subroutine compute_equdensity_for_gy
  
 
      subroutine compute_equdensity(numparticles,box,re,rs,rw,rn,rne,rse,rsw,rnw,pic2d,eqdistr,statkind)
@@ -207,7 +220,7 @@ contains
        real8 :: gxmin(2), delta(2),coords(2),mean(2)
        int4 :: ND(2),rank,comm,boxindex(4),row,numproc(2),globind(2)
        int4 :: i,j     
-       real8 :: summ=0.0
+       real8 :: summ
 
        character(len=*), optional,intent(in) :: eqdistr
        int4, intent(in) :: statkind
@@ -224,6 +237,7 @@ contains
        row=pic2d%para2d%row
        numproc=NINT(sqrt(real(pic2d%layout2d%collective%size,8)))
        mean=(pic2d%para2d%gxmin+pic2d%para2d%gxmax)/2.0
+       summ = 0.0  
 
 !!!!! Here, MPI_ALLREDUCE is better.      
        select case(statkind)
@@ -245,6 +259,7 @@ contains
                     *delta(2)/summ*real(numparticles,8)
            end do
          enddo
+
          
        case(2)
          box = pic2d%field2d%denf         
@@ -257,7 +272,59 @@ contains
        call mpi2d_alltoallv_box_per_per(row,comm,rank,numproc, &
                                         box,rw,re,rn,rs,rsw,rse,rnw,rne,boxindex)
        
-     end subroutine
+     end subroutine compute_equdensity
+
+     subroutine compute_equdensity_initdistr_gy(mu_num,munum_partition,eqdistr,statkind,pic2d)
+       class(pic_para_total2d_base), pointer, intent(inout) :: pic2d
+       int4, dimension(:), intent(in) :: munum_partition
+       int4, intent(in) :: mu_num
+       character(len=*), optional,intent(in) :: eqdistr
+       int4, intent(in) :: statkind
+       int4 :: rank,num1,num2,row, sizeone
+       int4 :: i,j,ierr
+
+       real8,dimension(:,:),pointer :: box,re,rs,rw,rn,rne,rse,rsw,rnw 
+
+       rank=pic2d%layout2d%collective%rank
+       num1=size(pic2d%field2d%ep,1)
+       num2=size(pic2d%field2d%ep,2)
+       row=pic2d%para2d%row
+       sizeone=pic2d%layout2d%collective%size
+       allocate(box(num1,num2),rw(num1,row),re(num1,row),rn(row,num2),rs(row,num2), &
+             rsw(row,row),rse(row,row),rnw(row,row),rne(row,row),stat=ierr)       
+       
+       do i=1, mu_num
+
+         box=0.0
+         rw=0.0
+         re=0.0
+         rn=0.0
+         rs=0.0
+         rsw=0.0
+         rse=0.0
+         rnw=0.0
+         rne=0.0
+         
+         call compute_equdensity(sizeone*munum_partition(i),box,re,rs,rw,rn,rne,rse,rsw,rnw, &
+                pic2d,eqdistr,statkind)
+
+!   if(rank==0) then
+!     print*, "i=",i,rne
+!   endif
+           pic2d%field2d%dengeq(i,:,:)=box
+           pic2d%field2d%dengeq_e(i,:,:)=re 
+           pic2d%field2d%dengeq_s(i,:,:)=rs
+           pic2d%field2d%dengeq_w(i,:,:)=rw
+           pic2d%field2d%dengeq_n(i,:,:)=rn
+           pic2d%field2d%dengeq_ne(i,:,:)=rne
+           pic2d%field2d%dengeq_se(i,:,:)=rse
+           pic2d%field2d%dengeq_sw(i,:,:)=rsw
+           pic2d%field2d%dengeq_nw(i,:,:)=rnw
+ 
+       end do
+
+       deallocate(box,re,rs,rw,rn,rne,rse,rsw,rnw)
+     end subroutine  compute_equdensity_initdistr_gy
 
      subroutine compute_gyrodensity_perturbation(rootdata,pic2d,pamearray)
        class(pic_para_total2d_base), pointer, intent(inout) :: pic2d
@@ -265,19 +332,23 @@ contains
        class(parameters_array_2d), pointer, intent(in) :: pamearray
        real8,dimension(:,:), pointer :: buf
        real8,dimension(:,:),pointer :: box,re,rs,rw,rn,rne,rse,rsw,rnw
-       int4 :: i,num1,num2,row,comm,rank,numproc(2),boxindex(4),ierr     
-    
+       int4 :: num1,num2,row,comm,rank,numproc(2),boxindex(4),ierr     
+       int4 :: ND(2),i,j   
+ 
        row=pic2d%para2d%row
        comm=pic2d%layout2d%collective%comm
        rank=pic2d%layout2d%collective%rank
        numproc=pic2d%para2d%numproc
        num1=size(pic2d%field2d%deng_weight,2)
        num2=size(pic2d%field2d%deng_weight,3)
+       ND(1)=pic2d%para2d%m_x1%nodes
+       ND(2)=pic2d%para2d%m_x2%nodes
        call get_layout_2d_box_index(pic2d%layout2d,rank,boxindex)
        allocate(buf(num1,num2))
        allocate(box(num1,num2),rw(num1,row),re(num1,row),rn(row,num2),rs(row,num2), &
              rsw(row,row),rse(row,row),rnw(row,row),rne(row,row),stat=ierr)
 
+       pic2d%field2d%dengtot = 0.0
        do i=1,pic2d%para2d%mu_num
          buf=0.0
          box=0.0
@@ -294,15 +365,15 @@ contains
          call solve_weight_of_field_among_processes(buf,rootdata, &         
               pic2d,box,rw,re,rn,rs,rsw,rse,rnw,rne)
 
-         pic2d%field2d%deng_weight(i,:,:)=box
-         pic2d%field2d%dengwg_w(i,:,:)=rw
-         pic2d%field2d%dengwg_e(i,:,:)=re
-         pic2d%field2d%dengwg_n(i,:,:)=rn
-         pic2d%field2d%dengwg_s(i,:,:)=rs
-         pic2d%field2d%dengwg_sw(i,:,:)=rsw
-         pic2d%field2d%dengwg_se(i,:,:)=rse
-         pic2d%field2d%dengwg_nw(i,:,:)=rnw 
-         pic2d%field2d%dengwg_ne(i,:,:)=rne
+!         pic2d%field2d%deng_weight(i,:,:)=box
+!         pic2d%field2d%dengwg_w(i,:,:)=rw
+!         pic2d%field2d%dengwg_e(i,:,:)=re
+!         pic2d%field2d%dengwg_n(i,:,:)=rn
+!         pic2d%field2d%dengwg_s(i,:,:)=rs
+!         pic2d%field2d%dengwg_sw(i,:,:)=rsw
+!         pic2d%field2d%dengwg_se(i,:,:)=rse
+!         pic2d%field2d%dengwg_nw(i,:,:)=rnw 
+!         pic2d%field2d%dengwg_ne(i,:,:)=rne
          
          buf=0.0            
          call para_compute_gyroaverage_field_on_mesh(pamearray%mu_nodes(i),i,pic2d,buf, &
@@ -310,12 +381,15 @@ contains
    
          pic2d%field2d%dengtot=pic2d%field2d%dengtot+buf
        end do
-      
-         pic2d%field2d%dengtot=pic2d%field2d%dengtot-pic2d%field2d%dengeqtot 
-!if(rank==0) then
-!print*, pic2d%field2d%dengeqtot
-!endif
-         call mpi2d_alltoallv_box_per_per(row,comm,rank,numproc, &
+       
+       do j=1,ND(2)
+         do i=1,ND(1)
+          pic2d%field2d%dengtot(i,j)=(pic2d%field2d%dengtot(i,j)-pic2d%field2d%dengeqtot(i,j)) &
+                                      /pic2d%field2d%dengeqtot(i,j) 
+         end do 
+       end do 
+
+        call mpi2d_alltoallv_box_per_per(row,comm,rank,numproc, &
               pic2d%field2d%dengtot,pic2d%field2d%dengtot_w,pic2d%field2d%dengtot_e,pic2d%field2d%dengtot_n, &
               pic2d%field2d%dengtot_s,pic2d%field2d%dengtot_sw,pic2d%field2d%dengtot_se,pic2d%field2d%dengtot_nw, &
               pic2d%field2d%dengtot_ne,boxindex)

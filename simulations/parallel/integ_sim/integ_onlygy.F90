@@ -67,7 +67,8 @@ use m_fieldsolver, only: solve_weight_of_field_among_processes, &
                          solve_gyfieldweight_from_field, &
                          compute_equdensity, &
                          compute_equdensity_for_gy, &
-                         compute_gyrodensity_perturbation
+                         compute_gyrodensity_perturbation, &
+                         compute_equdensity_initdistr_gy
 
 use m_precompute,  only: precompute_ASPL
 use m_moveparticles, only: new_position_per_per_ful, &
@@ -199,8 +200,8 @@ include "mpif.h"
     pic2d%para2d%N_points=20
     pic2d%para2d%iter_number=10
     pic2d%para2d%numcircle=8
-    pic2d%para2d%numparticles=200000
-    pic2d%para2d%dtgy=2.0
+    pic2d%para2d%numparticles=100000
+    pic2d%para2d%dtgy=3.0
     pic2d%para2d%num_time= 16 ! 15
     pic2d%para2d%boundary="double_per"
     pic2d%para2d%geometry="cartesian"
@@ -214,13 +215,13 @@ include "mpif.h"
     pic2d%para2d%tempt = 1.0
     pic2d%para2d%mumin=0.0_f64
     pic2d%para2d%mumax=4._F64
-    pic2d%para2d%mu_tail=500
-    pic2d%para2d%mulast = 50
+    pic2d%para2d%mu_tail=800
+    pic2d%para2d%mulast = 30
 !    pic2d%para2d%mu_num=39
     pic2d%para2d%gyroorder=1
-    pic2d%para2d%amp = 0.2
-    pic2d%para2d%waveone = 2.0
-    pic2d%para2d%wavetwo = 2.0
+    pic2d%para2d%amp = 0.0
+    pic2d%para2d%waveone = 0.0
+    pic2d%para2d%wavetwo = 0.0
     row=pic2d%para2d%row
     amp=0.01
     amp_eq=0.0
@@ -376,26 +377,31 @@ include "mpif.h"
         end if
   call partition_density_to_grid_ful(ful2d_head,pic2d)
 
+  call compute_equdensity_initdistr_gy(mu_num,pamearray%munum_partition,"flat",1,pic2d)
+  call compute_equdensity_for_gy(pic2d)
+
+!  call partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d,0)
+
+!  pic2d%field2d%dengeq = pic2d%field2d%deng
+
 !if(rank==1) then
-!print*, "denf",pic2d%field2d%denf
+!print*, "denf",pic2d%field2d%dengeqtot(:,:)
 !endif
 
   !!!! Here the equilibrium profile is not steep. For steep profile, the
   !gyroaverage operation should be implemented.
 
-  call compute_equdensity(sum*pic2d%para2d%numcircle*size,pic2d%field2d%denfeq, &
-       pic2d%field2d%denfeq_e,pic2d%field2d%denfeq_s,pic2d%field2d%denfeq_w, &
-       pic2d%field2d%denfeq_n,pic2d%field2d%denfeq_ne,pic2d%field2d%denfeq_se, &
-       pic2d%field2d%denfeq_sw,pic2d%field2d%denfeq_nw,pic2d, "flat", 1)
+!  call compute_equdensity(sum*pic2d%para2d%numcircle*size,pic2d%field2d%denfeq, &
+!       pic2d%field2d%denfeq_e,pic2d%field2d%denfeq_s,pic2d%field2d%denfeq_w, &
+!       pic2d%field2d%denfeq_n,pic2d%field2d%denfeq_ne,pic2d%field2d%denfeq_se, &
+!       pic2d%field2d%denfeq_sw,pic2d%field2d%denfeq_nw,pic2d, "flat", 1)
 !if(rank==1) then
 !print*, "denfeq",pic2d%field2d%denfeq
 !endif
-  call compare_density_to_initnumber_gy(pic2d%field2d%denf, pic2d)
+! call compare_density_to_initnumber_gy(pic2d%field2d%denf, pic2d)
+!  call partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d,1)
 
-  call partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d)
-
-!  pic2d%field2d%dengeqtot = pic2d%field2d%denfeq
-
+!  pic2d%field2d%dengeqtot = pic2d%field2d%denfeq/real(pic2d%para2d%numcircle,8)
 if(rank==0) then
 print*, "#computing density is finished."
 end if
@@ -405,9 +411,9 @@ end if
 !if(rank==0) then
 !print*, "#precomputing ASPL is finished."
 !endif
-
+ 
   call precompute_doublegyroaverage_matrix(rootdata,pic2d,pamearray)
-
+ 
   call solve_weight_of_field_among_processes(pic2d%field2d%Bf03,rootdata,pic2d, &
        pic2d%field2d%bf03wg,pic2d%field2d%BF03wg_w,pic2d%field2d%bf03wg_e,pic2d%field2d%bf03wg_n, &
        pic2d%field2d%bf03wg_s, pic2d%field2d%bf03wg_sw,pic2d%field2d%bf03wg_se, &
@@ -451,92 +457,44 @@ endif
    filepathorb_boris=trim(filepathorb)//"boris"//".txt"
    call open_file(40, filepathorb_boris, rank)
    call open_file(50, filepathden_ful,rank)
-!     call open_file(40, filepathden_ful,rank)
-!     i=1
-!       write(unit=muth,fmt=*) i
-!       filepath_gy=trim(filepath1)//"gy_"//trim(adjustl(muth))//".txt"
-!       call open_file(i,   filepath_gy,   rank)
-!     pic2d%field2d%denf=pic2d%field2d%denf-pic2d%field2d%denfeq
-!     call para_write_field_file_2d(pic2d%field2d%denf,40,rootdata,pic2d)
 
-!     close(40)
-!        call para_write_field_file_2d(pic2d%field2d%ep,fileitemep_boris,rootdata,pic2d)
-!  ND(1) = pic2d%para2d%m_x1%nodes
-!  ND(2) = pic2d%para2d%m_x2%nodes
-!
-!        do j=1,ND(2)
-!          do k=1,ND(1)
-!            pic2d%field2d%dengtot(k,j)=(pic2d%field2d%denf(k,j)-pic2d%field2d%denfeq(k,j))/pic2d%field2d%denfeq(k,j)
-!          end do
-!        enddo
-
-!call para_write_field_file_2d(pic2d%field2d%dengtot,50,rootdata,pic2d)
-!
-!call solve_field_ful(rootdata,pic2d,pamearray)
-!        call solve_weight_of_field_among_processes(pic2d%field2d%ep,rootdata,pic2d, &
-!        pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n,&
-!        pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
-!        pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
-
-! if(rank==2) then
-!print*, "rank=",rank,pic2d%field2d%ep_weight
-!print*,
-!endif
-
-
-  do i=1, 100  !pic2d%para2d%iter_number
+  do i=1, 200  !pic2d%para2d%iter_number
     if(rank==0) then
       print*, "#iter_number=", i
     endif
-    !!! and store the equilibrium distirbution on the mesh
-    call partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d)
-!print*, 3
-    call compute_gyrodensity_perturbation(rootdata,pic2d,pamearray)
-!print*, 4
-    call solve_field_quasi_neutral(rank,rootdata,pic2d,pamearray)  !!! solve the electrostatic potential
 
-    call solve_gyfieldweight_from_field(rootdata,pic2d,pamearray)
-!print*, 1
+    !!! and store the equilibrium distirbution on the mesh
+!print*, "i=",i
+    call partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d,i)
+!print*, rank
+    call compute_gyrodensity_perturbation(rootdata,pic2d,pamearray)
+!print*,"i1=",i
+!if(rank==0) then
+!print*, "dengtot=",pic2d%field2d%dengtot
+!endif
+
+    call solve_field_quasi_neutral(rank,rootdata,pic2d,pamearray)  !!! solve the electrostatic potential
+!print*,"i2=",i
+!if(rank==0) then
+!print*, pic2d%field2d%gep
+!endif
+    if(modulo(i,3)==1) then
+      call para_write_field_file_2d(pic2d%field2d%gep,fileitemep_gy,rootdata,pic2d)
+    endif
 
     call solve_weight_of_field_among_processes(pic2d%field2d%gep,rootdata,pic2d, &
        pic2d%field2d%gep_weight, pic2d%field2d%gepwg_w,pic2d%field2d%gepwg_e,pic2d%field2d%gepwg_n, &
        pic2d%field2d%gepwg_s, pic2d%field2d%gepwg_sw,pic2d%field2d%gepwg_se, &
        pic2d%field2d%gepwg_nw,pic2d%field2d%gepwg_ne)
 
+
+    call solve_gyfieldweight_from_field(rootdata,pic2d,pamearray)
+
+!if(rank==0) then
+!print*, pic2d%field2d%epgyro
+!endif
+
     call gyrork4solveallmu_and_sort(gy2dmu_head,pic2d,pic2d%para2d%iter_number)
-!print*, 2
-
-    call para_write_field_file_2d(pic2d%field2d%gep,fileitemep_gy,rootdata,pic2d)
- 
-!     do j=1,pic2d%para2d%num_time
-!       if(rank==0) then
-!         print*, "#j=",j
-!       endif
-!        if(modulo(i,3)==1) then
-!          call para_write_field_file_2d(pic2d%field2d%ep,fileitemep_boris,rootdata,pic2d)
-!        endif
-
-
-!        do j=1,ND(2)
-!          do k=1,ND(1)
-!            pic2d%field2d%denf(k,j)=(pic2d%field2d%denf(k,j)-pic2d%field2d%denfeq(k,j))/pic2d%field2d%denfeq(k,j)
-!          end do
-!        enddo
-
-
-!        call solve_weight_of_field_among_processes(pic2d%field2d%denf,rootdata,pic2d, &
-!        pic2d%field2d%ep_weight,pic2d%field2d%epwg_w,pic2d%field2d%epwg_e,pic2d%field2d%epwg_n,&
-!        pic2d%field2d%epwg_s, pic2d%field2d%epwg_sw,pic2d%field2d%epwg_se, &
-!        pic2d%field2d%epwg_nw,pic2d%field2d%epwg_ne)
-! 
-!        call borissolve_and_sort(ful2d_head,pic2d)
-!
-!        call partition_density_to_grid_ful(ful2d_head,pic2d)
-!
-!         call solve_field_ful(rootdata,pic2d,pamearray)
-!  
-!        call move_print_tp_particles(tpful2d_head,numleft_boris, &
-!             numgr,40,j,"boris",pic2d)
 
 
   end do
@@ -550,7 +508,7 @@ endif
  !!! and store the equilibrium distirbution on the mesh
     call MPI_FINALIZE(IERR) 
     if(rank==0) then
-      print*, "#The simultion is finished."
+      print*, "#The simulation is finished."
     endif  
 end program  integ_onlygy
 

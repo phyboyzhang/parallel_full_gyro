@@ -4,7 +4,7 @@ use spline_module, only: compute_D_spl2D_per_per_noblock
 use piclayout, only: root_precompute_data, parameters_array_2d
 use paradata_type, only: pic_para_total2d_base
 use m_parautilities, only: gather_field_to_rootprocess_per_per
-use para_gyroaverage_2d_one, only: store_data_on_rootprocess
+use para_gyroaverage_2d_one, only: compute_gyroaverage_matrix
 implicit none
 
 public :: precompute_ASPL, &
@@ -36,9 +36,11 @@ contains
       real8, dimension(:), pointer :: density
       int4 :: rank,size,boxindex(4)
       int4 :: ierr, numdim,i,j,mu_num,num1,num2
-      real8, dimension(:,:), pointer :: buf,buf1
+      real8, dimension(:,:), pointer :: buf,buf1,buf3
       real8, dimension(:,:), allocatable :: buf2
+      real8, dimension(:), pointer :: iontemp
       real8 :: mu
+      int4 :: globsz(2),ND(2)
 
       int4 :: LDA, INFO, LWORK
       int4, dimension(:), allocatable :: ipiv
@@ -52,34 +54,48 @@ contains
       boxindex(2)=pic2d%layout2d%boxes(rank)%i_max
       boxindex(3)=pic2d%layout2d%boxes(rank)%j_min
       boxindex(4)=pic2d%layout2d%boxes(rank)%j_min
-      allocate(density(numdim),stat=ierr)
-!      allocate(buf(boxindex(2)-boxindex(1)+1,boxindex(4)-boxindex(3)+1))
+      globsz(1) = pic2d%layout2d%global_sz1
+      globsz(2) = pic2d%layout2d%global_sz2
+      ND(1)=pic2d%para2d%m_x1%nodes
+      ND(2)=pic2d%para2d%m_x2%nodes
 
-!      buf= pic2d%field2d%den-pic2d%field2d%denequ
-      call gather_field_to_rootprocess_per_per(density,pic2d%field2d%dengeqtot,rank, &
-           size,boxindex,pic2d%para2d%numproc,pic2d%layout2d)
+      allocate(density(numdim),buf3(ND(1),ND(2)),stat=ierr)
+
+      if(rank==0) then
+        allocate(iontemp(numdim))
+        do j=1, globsz(2)
+          do i=1, globsz(1) 
+            iontemp(i+(j-1)*globsz(1))=pic2d%para2d%temp_i(i,j)
+          end do
+        end do
+      endif
+
      if(rank==0) then
         allocate(buf1(numdim,numdim),buf2(numdim,numdim))
         buf2=0.0
      end if
       do j=1,mu_num
+        buf3 = pic2d%field2d%dengeq(j,:,:)  
+        call gather_field_to_rootprocess_per_per(density,buf3,rank, &
+           size,boxindex,pic2d%para2d%numproc,pic2d%layout2d)
          mu=pamearray%mu_nodes(j)
          if(rank==0) then     
            buf1=0.0
          end if
-if(rank==0) then
-print*, "double gyroaverge for the jth mu,#j=",j
-end if
-         call store_data_on_rootprocess(mu,j,rank,rootdata,pic2d)
+        
+        if(rank==0) then
+          print*, "double gyroaverge for the jth mu,#j=",j
+        end if
+      
+        call compute_gyroaverage_matrix(mu,j,rank,rootdata,pic2d)
 
          if(rank==0) then
            buf1=matmul(rootdata%ACONTRI,rootdata%ASPL)
-
            do i=1, numdim
-             buf1(i,:)=buf1(i,:)*density(i)   ! ????
+             buf1(i,:)=buf1(i,:)*density(i)  ! ????
            end do
            buf1=matmul(rootdata%ASPL,buf1)
-           buf2=buf2+matmul(rootdata%ACONTRI,buf1)*pamearray%mu_weights(j)
+           buf2=buf2+matmul(rootdata%ACONTRI,buf1)
 
          endif
       end do

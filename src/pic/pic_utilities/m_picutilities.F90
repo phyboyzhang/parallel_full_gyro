@@ -141,10 +141,11 @@ contains
   end subroutine partition_density_to_grid_gy
  
 
-  subroutine partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d)
+  subroutine partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d,iter_num)
     class(gy2dmu_node),dimension(:), pointer :: gy2dmu_head
     class(pic_para_total2d_base), pointer :: pic2d
     class(gy2dmu_node),dimension(:), pointer :: gy2dmutmp
+    int4, intent(in) :: iter_num
     int4 :: i,ierr,num1,num2,boxindex(4),rank,row,mu_num
     real8 :: x(2), delta(2),xmin(2)
 
@@ -180,11 +181,14 @@ contains
        rse=0.0
        rnw=0.0
        rne=0.0
-      
+     
        gy2dmutmp(i)%ptr=>gy2dmu_head(i)%ptr     
        do while(associated(gy2dmutmp(i)%ptr))
          if(associated(gy2dmutmp(i)%ptr%next)) then
            x(1:2)=gy2dmutmp(i)%ptr%coords(1:2)
+! if(rank==5.and.i==5.and.iter_num==2) then
+!print*, gy2dmutmp(i)%ptr%coords(1:2)
+!endif
            call singlepart_to_mesh(box,x,delta,xmin)      
            gy2dmutmp(i)%ptr=>gy2dmutmp(i)%ptr%next
          else
@@ -194,7 +198,9 @@ contains
 
        call combine_boundfield_between_neighbor_alltoall(box,pic2d%para2d%numproc,pic2d%layout2d, &
             re,rs,rw,rn,rne,rse,rsw,rnw)
-
+!if(rank==0) then
+!print*, "i1=",i
+!endif
        pic2d%field2d%deng(i,:,:)=box
        pic2d%field2d%deng_e(i,:,:)=re
        pic2d%field2d%deng_s(i,:,:)=rs
@@ -204,9 +210,12 @@ contains
        pic2d%field2d%deng_se(i,:,:)=rse
        pic2d%field2d%deng_sw(i,:,:)=rsw
        pic2d%field2d%deng_nw(i,:,:)=rnw
+
     end do
 
-    deallocate(box,re,rs,rw,rn,rne,rse,rsw,rnw)
+!    deallocate(box,re,rs,rw,rn,rne,rse,rsw,rnw)
+!    deallocate(gy2dmutmp)
+
   end subroutine partition_density_to_grid_gy_allmu
 
   !!!!!!!!! the arrangement of the trapezoid

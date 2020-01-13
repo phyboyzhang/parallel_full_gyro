@@ -83,7 +83,8 @@ use m_para_orbit, only: borissolve, fulrk4solve, gyrork4solveallmu, &
                         compute_f_of_points_out_orbit_ful2d, &
                         fulrkfunc_f_per_per, &
                         compute_f_of_points_in_orbit_ful2d, &
-                        gyrork4solveallmu
+                        gyrork4solveallmu, &
+                        gyrork4solveallmu_and_sort
 use orbit_data_base, only: rk4ful2dnode, pointin_node,tp_ful2d_node, &
                            tp_ful2dsend_node, &
                            rk4gy2dnode, tp_gy2d_node,tp_gy2dsend_node
@@ -185,7 +186,7 @@ include "mpif.h"
     pic2d%para2d%N_points=50
     pic2d%para2d%iter_number=10
     pic2d%para2d%numcircle=8
-    pic2d%para2d%numparticles=300000
+    pic2d%para2d%numparticles=50000
     pic2d%para2d%dtgy=1.0
     pic2d%para2d%num_time=15
     pic2d%para2d%boundary="double_per"
@@ -201,7 +202,7 @@ include "mpif.h"
     pic2d%para2d%mumin=0.0_f64
     pic2d%para2d%mumax=20._F64
     pic2d%para2d%mu_tail=1000
-    pic2d%para2d%mulast = 40
+    pic2d%para2d%mulast = 10
 !    pic2d%para2d%mu_num=39
     pic2d%para2d%gyroorder=1
     row=pic2d%para2d%row
@@ -354,8 +355,13 @@ endif
 
     call solve_gyfieldweight_from_field(rootdata,pic2d,pamearray)
 
-    call gyrork4solveallmu(gy2dmu_head,pic2d,pic2d%para2d%iter_number)
-
+do i=1,10
+if(rank==0) then
+print*, "#i=", i
+endif
+!    call gyrork4solveallmu(gy2dmu_head,pic2d,pic2d%para2d%iter_number)
+   call gyrork4solveallmu_and_sort(gy2dmu_head,pic2d,i)
+end do
 
 !  do i=1,pic2d%para2d%iter_number
 !    if(rank==0) then

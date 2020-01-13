@@ -392,7 +392,7 @@ include "mpif.h"
 !endif
   call compare_density_to_initnumber_gy(pic2d%field2d%denf, pic2d)
 
-  call partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d)
+  call partition_density_to_grid_gy_allmu(gy2dmu_head,pic2d,1)
 
   pic2d%field2d%dengeqtot = pic2d%field2d%denfeq
 

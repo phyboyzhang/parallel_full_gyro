@@ -7,13 +7,21 @@ use paradata_type, only: pic_para_2d_base, &
                               pic_para_total2d_base
 use paradata_layout, only:    initialize_pic_para_2d_base, &
                               initialize_pic_para_total2d_base, &
-                              allocate_memory_to_field_2d
-                              
+                              allocate_parameters_array_2d, &
+                              allocate_memory_to_field_2d_ful, &
+                              allocate_memory_to_field_2d_gy,  &
+                              allocate_memory_to_magfield_2d, &
+                              initialize_parameters_2d,  &
+                              initialize_parameters_array_2d, &
+                              computing_mu_number                              
+
+
 use utilities_module, only: f_is_power_of_two
 use m_mpilayout, only : initialize_layout_with_distributed_2d_array, &
                         get_layout_2d_box_index
 use piclayout, only :   root_precompute_data, &
-                        initialize_rootdata_structure
+                        initialize_rootdata_structure, &
+                        parameters_array_2d
 use m_parautilities, only: mpi2d_alltoallv_box_per_per, &
                            gather_field_to_rootprocess_per_per, &
                            scatter_field_from_rootprocess_per_per
@@ -38,6 +46,7 @@ include "mpif.h"
     class(pic_para_total2d_base),pointer :: pic2d
  !   class(pic_para_total2d_base)
     class(root_precompute_data), pointer :: rootdata
+    class(parameters_array_2d),  pointer :: pamearray
     int4 :: rank,size,global_sz(2)
     real8 :: delta(2)
     int4  :: num1,num2,row
@@ -58,8 +67,13 @@ include "mpif.h"
     real8 :: mu
     real8 :: rho
     int4 :: rankpoint
+    real8, dimension(:), pointer :: mu_nodes,mu_weights
+    int4, dimension(:), pointer :: munum_partition
+    int4 :: mu_num,mutest
+    int4 :: sum
 
     allocate(weight(-1:2,-1:2))
+
 
     call MPI_INIT(IERR)
     call MPI_COMM_SIZE(MPI_COMM_WORLD,size,ierr)
@@ -111,45 +125,48 @@ include "mpif.h"
          print*, "size,boxes(i),",i,pic2d%layout2d%boxes(i)
        enddo  
     end if 
-!    allocate(pic2d%para2d%gboxmin(0:size-1,2),pic2d%para2d%gboxmax(0:size-1,2))
-call mpi_barrier(mpi_comm_world)
- 
-  do i=0,pic2d%para2d%numproc(2)-1      
-    do j=0,pic2d%para2d%numproc(1)-1
-    size1=get_rank_from_processcoords((/j,i/),pic2d%para2d%numproc)
-    if(size1==0) then
-       pic2d%para2d%gboxmin(0,:)=pic2d%para2d%gxmin(:)
-    else
-       startind=startind_of_process(size1,pic2d%para2d%numproc,pic2d%layout2d) 
-       if(rank==0) then
-         print*, "size1=",size1,"startind=",startind
-       end if
-       do k=1,2 
-          pic2d%para2d%gboxmin(size1,k)=pic2d%para2d%gxmin(k)+(startind(k)-1)*delta(k)
-       end do
-    end if
 
-    pic2d%para2d%gboxmax(size1,1)=pic2d%para2d%gboxmin(size1,1)+delta(1)*real(pic2d%layout2d%boxes(size1)%i_max &
-    -pic2d%layout2d%boxes(size1)%i_min,8)
-    pic2d%para2d%gboxmax(size1,2)=pic2d%para2d%gboxmin(size1,2)+delta(2)*real(pic2d%layout2d%boxes(size1)%j_max &
-    -pic2d%layout2d%boxes(size1)%j_min,8)
+    global_sz(1)=pic2d%layout2d%global_sz1
+    global_sz(2)=pic2d%layout2d%global_sz2
 
-    end do
-  end do
+    allocate(mu_nodes(100),mu_weights(100),munum_partition(100))
+    munum_partition=0
+    call computing_mu_number(mu_nodes,mu_weights,munum_partition,mu_num, pic2d)
+    pic2d%para2d%mu_num=mu_num
+
+     pamearray=>allocate_parameters_array_2d(mu_num,global_sz(1:2))
+
+   call initialize_parameters_2d(pic2d,global_sz)
+   call initialize_parameters_array_2d(pic2d%para2d%mumax,mu_num,pic2d%para2d%mu_scheme,pamearray, &
+        mu_nodes,mu_weights,munum_partition,pic2d%para2d%tempt)
+
+   sum=0
+   do i=1,mu_num
+     sum=pamearray%munum_partition(i)+sum
+   end do
+
+   if(rank==0) then
+   !print*, "mu_num=",mu_num, "mutest=",mutest
+   print*, "sum=",sum*size
+   print*, "munum_partition=",pamearray%munum_partition
+   print*, "mu_num=",pic2d%para2d%mu_num
+   print*, "mu_nodes=",pamearray%mu_nodes
+   print*, "mu_weights=",pamearray%mu_weights
+   end if
 
 if(rank==0) then
    print*, "gboxmin(:,1)",pic2d%para2d%gboxmin(:,1)
   print*, "gboxmax(:,1)",pic2d%para2d%gboxmax(:,1) 
 end if
  
-    pic2d%para2d%m_x1=>init_para_cartesian_mesh_1d(pic2d%layout2d%boxes(rank)%i_max-pic2d%layout2d%boxes(rank)%i_min+1,&
-    pic2d%para2d%gboxmin(rank,1),pic2d%para2d%gboxmax(rank,1),delta(1))
-    pic2d%para2d%m_x2=>init_para_cartesian_mesh_1d(pic2d%layout2d%boxes(rank)%j_max-pic2d%layout2d%boxes(rank)%j_min+1,&
-    pic2d%para2d%gboxmin(rank,2),pic2d%para2d%gboxmax(rank,2),delta(2)) 
     num1=pic2d%layout2d%boxes(rank)%i_max-pic2d%layout2d%boxes(rank)%i_min+1
     num2=pic2d%layout2d%boxes(rank)%j_max-pic2d%layout2d%boxes(rank)%j_min+1                    
 
-    call allocate_memory_to_field_2d(pic2d%field2d,num1,num2,row)
+    call allocate_memory_to_field_2d_ful(pic2d%field2d,num1,num2,row)
+    call allocate_memory_to_field_2d_gy(pic2d%field2d,num1,num2,row,mu_num)
+    call allocate_memory_to_magfield_2D(pic2d%field2d,num1,num2,row)
+
+!    call allocate_memory_to_field_2d(pic2d%field2d,num1,num2,row)
     boxindex(1)=pic2d%layout2d%boxes(rank)%i_min
     boxindex(2)=pic2d%layout2d%boxes(rank)%i_max
     boxindex(3)=pic2d%layout2d%boxes(rank)%j_min
